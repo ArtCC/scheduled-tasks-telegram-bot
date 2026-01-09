@@ -423,7 +423,7 @@ async def handle_status(message: Message) -> None:
             continue
 
     scheduler_status = "🟢 Running" if status["running"] else "🔴 Stopped"
-    
+
     lines = [
         "📊 <b>Bot Status</b>",
         "━━━━━━━━━━━━━━━━━━",
@@ -519,7 +519,7 @@ def _format_task_text(task) -> str:
     # Type icon
     type_icon = "🔔" if task.is_reminder else "🤖"
     task_name = task.display_name
-    
+
     # Truncate prompt for display (max 100 chars)
     prompt_display = task.prompt[:100] + "..." if len(task.prompt) > 100 else task.prompt
 
