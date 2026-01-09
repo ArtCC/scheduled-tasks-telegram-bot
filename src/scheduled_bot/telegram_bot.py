@@ -38,7 +38,8 @@ class AuthMiddleware(BaseMiddleware):
         if isinstance(event, Message) and event.chat:
             if event.chat.id not in scheduler.settings.allowed_chat_ids:
                 logger.warning(
-                    "Unauthorized access attempt from chat_id=%s", event.chat.id
+                    "Unauthorized access attempt from chat_id=%s",
+                    event.chat.id,
                 )
                 await event.answer(
                     "⛔ You are not authorized to use this bot.\n\n"
