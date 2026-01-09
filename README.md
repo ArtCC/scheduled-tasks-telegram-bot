@@ -52,10 +52,10 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 | `OPENAI_MODEL` | ❌ | `gpt-4.1-mini` | OpenAI model to use |
 | `TIMEZONE` | ❌ | `UTC` | Default timezone (IANA format) |
 | `DATABASE_PATH` | ❌ | `/app/data/bot.db` | SQLite database path |
-| `OPENAI_MAX_TOKENS` | ❌ | `400` | Max tokens per response |
+| `OPENAI_MAX_TOKENS` | ❌ | `4096` | Max tokens per response |
 | `OPENAI_TEMPERATURE` | ❌ | `0.4` | Model temperature |
-| `MAX_PROMPT_CHARS` | ❌ | `1200` | Max prompt length |
-| `MAX_RESPONSE_CHARS` | ❌ | `3500` | Max response length |
+| `MAX_PROMPT_CHARS` | ❌ | `4000` | Max prompt length |
+| `MAX_RESPONSE_CHARS` | ❌ | `4000` | Max response length |
 | `OPENAI_MAX_RETRIES` | ❌ | `3` | Retries with exponential backoff |
 
 > 💡 See [.env.example](.env.example) for a complete template.

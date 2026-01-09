@@ -40,8 +40,9 @@ def _extract_response_text(response) -> str:
     - response.output[].content[].text (where type == "output_text")
     """
     # Method 1: SDK convenience property (Python/JS SDKs)
-    if hasattr(response, "output_text") and response.output_text:
-        return str(response.output_text)
+    output_text = getattr(response, "output_text", None)
+    if output_text:
+        return str(output_text)
 
     # Method 2: Parse output array structure
     if hasattr(response, "output") and response.output:
@@ -56,10 +57,13 @@ def _extract_response_text(response) -> str:
                         if text:
                             return str(text)
 
+    # Log details for debugging
+    status = getattr(response, "status", "unknown")
     logger.warning(
-        "Could not extract text. Response type: %s, has output_text: %s",
+        "Could not extract text. Status: %s, Response type: %s, output_text value: %r",
+        status,
         type(response).__name__,
-        hasattr(response, "output_text"),
+        output_text,
     )
     return ""
 

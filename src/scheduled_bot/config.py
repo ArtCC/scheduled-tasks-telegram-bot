@@ -15,10 +15,10 @@ class Settings:
     openai_model: str = "gpt-4.1-mini"
     timezone: str = "UTC"
     database_path: str = "./data/bot.db"
-    openai_max_tokens: int = 400
+    openai_max_tokens: int = 4096
     openai_temperature: float = 0.4
-    max_prompt_chars: int = 1200
-    response_max_chars: int = 3500
+    max_prompt_chars: int = 4000
+    response_max_chars: int = 4000
     openai_max_retries: int = 3
 
 
