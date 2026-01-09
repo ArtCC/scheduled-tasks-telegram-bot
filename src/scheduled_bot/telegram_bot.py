@@ -62,26 +62,30 @@ class AuthMiddleware(BaseMiddleware):
 @router.message(Command("start", "help"))
 async def handle_start(message: Message) -> None:
     text = (
-        "Hi! I'm your scheduled tasks bot.\n\n"
-        "<b>Commands:</b>\n"
-        "/ask &lt;question&gt; - Ask something right now\n"
-        "/add HH:MM [TZ] [days] [--name=X] &lt;request&gt; - Daily task\n"
-        "/add YYYY-MM-DDTHH:MM &lt;request&gt; - One-time task\n"
-        "/every &lt;interval&gt; &lt;request&gt; - Interval task\n"
-        "/remember HH:MM [TZ] [days] &lt;text&gt; - Simple reminder\n"
-        "/list - Show your scheduled tasks\n"
-        "/run &lt;id&gt; - Run a task now\n"
-        "/edit &lt;id&gt; &lt;new prompt&gt; - Edit a task\n"
-        "/pause &lt;id&gt; - Pause a task\n"
-        "/resume &lt;id&gt; - Resume a paused task\n"
-        "/delete &lt;id&gt; - Remove a task\n"
-        "/status - Bot status\n\n"
-        "<b>Examples:</b>\n"
-        "/add 08:00 Europe/Madrid Weather summary\n"
-        "/add 09:00 mon,wed,fri Weekly standup notes\n"
-        "/remember 09:00 Take medication\n"
-        "/remember 2026-03-15T10:00 Doctor appointment\n"
-        "/every 2h Check server status"
+        "🤖 <b>Scheduled Tasks Bot</b>\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "💬 <b>Instant Queries</b>\n"
+        "├ /ask &lt;question&gt; — Get an answer now\n\n"
+        "📅 <b>Create Tasks</b>\n"
+        "├ /add HH:MM [TZ] [days] [--name=X] &lt;prompt&gt;\n"
+        "├ /add YYYY-MM-DDTHH:MM &lt;prompt&gt;\n"
+        "├ /every &lt;interval&gt; &lt;prompt&gt;\n"
+        "└ /remember HH:MM &lt;text&gt; — No AI, plain text\n\n"
+        "🔧 <b>Manage Tasks</b>\n"
+        "├ /list — View all tasks\n"
+        "├ /run &lt;id&gt; — Execute now\n"
+        "├ /edit &lt;id&gt; &lt;new prompt&gt;\n"
+        "├ /pause &lt;id&gt; · /resume &lt;id&gt;\n"
+        "└ /delete &lt;id&gt;\n\n"
+        "📊 <b>Info</b>\n"
+        "└ /status — Bot status &amp; next runs\n\n"
+        "━━━━━━━━━━━━━━━━━━━━━\n"
+        "📝 <b>Examples</b>\n\n"
+        "<code>/add 08:00 Daily weather summary</code>\n"
+        "<code>/add 09:00 mon,wed,fri --name=Standup Team notes</code>\n"
+        "<code>/every 2h Check server status</code>\n"
+        "<code>/remember 09:00 Take medication</code>\n"
+        "<code>/remember 2026-03-15T10:00 Doctor appointment</code>"
     )
     await message.answer(text, parse_mode=ParseMode.HTML)
 
@@ -418,14 +422,21 @@ async def handle_status(message: Message) -> None:
         except (ValueError, TypeError):
             continue
 
+    scheduler_status = "🟢 Running" if status["running"] else "🔴 Stopped"
+    
     lines = [
-        "📊 <b>Bot Status</b>\n",
-        f"🟢 Scheduler: {'running' if status['running'] else '🔴 stopped'}",
-        f"📋 Your tasks: {len(tasks)} ({active} active, {paused} paused)",
+        "📊 <b>Bot Status</b>",
+        "━━━━━━━━━━━━━━━━━━",
+        "",
+        f"⚙️ Scheduler: {scheduler_status}",
+        f"📋 Tasks: <b>{len(tasks)}</b> total",
+        f"   ├ ▶️ Active: {active}",
+        f"   └ ⏸️ Paused: {paused}",
     ]
 
     if next_run:
-        lines.append(f"⏰ Next run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append("")
+        lines.append(f"⏰ Next run: <code>{next_run.strftime('%Y-%m-%d %H:%M')}</code>")
 
     await message.answer("\n".join(lines), parse_mode=ParseMode.HTML)
 
@@ -465,7 +476,13 @@ async def handle_list(message: Message) -> None:
     scheduler = _get_scheduler()
     tasks: List = scheduler.storage.list_tasks(message.chat.id)
     if not tasks:
-        await message.answer("You have no tasks.")
+        await message.answer(
+            "📋 <b>Your Tasks</b>\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "No tasks yet.\n\n"
+            "💡 <i>Use /add, /every or /remember to create one!</i>",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     for task in tasks:
@@ -479,21 +496,39 @@ async def handle_list(message: Message) -> None:
 
 def _format_task_text(task) -> str:
     """Format task for display in /list and callbacks."""
+    # Determine schedule type and format
     if task.interval_minutes:
         when = _format_interval(task.interval_minutes)
+        schedule_icon = "🔄"
     elif task.run_at:
-        when = task.run_at.isoformat()
+        when = task.run_at.strftime("%Y-%m-%d %H:%M")
+        schedule_icon = "📅"
     elif task.days_of_week:
         when = f"{task.hour:02d}:{task.minute:02d} ({task.days_of_week.upper()})"
+        schedule_icon = "📆"
     else:
         when = f"{task.hour:02d}:{task.minute:02d} daily"
+        schedule_icon = "🕐"
 
-    status = "⏸️ " if task.paused else ""
-    icon = "🔔 " if task.is_reminder else ""
+    # Status indicator
+    if task.paused:
+        status_line = "⏸️ <i>Paused</i>"
+    else:
+        status_line = "▶️ <i>Active</i>"
+
+    # Type icon
+    type_icon = "🔔" if task.is_reminder else "🤖"
     task_name = task.display_name
+    
+    # Truncate prompt for display (max 100 chars)
+    prompt_display = task.prompt[:100] + "..." if len(task.prompt) > 100 else task.prompt
+
     return (
-        f"{status}{icon}<b>{escape_html(task_name)}</b> (#{task.id}): "
-        f"{when} ({task.timezone})\n{escape_html(task.prompt)}"
+        f"{type_icon} <b>{escape_html(task_name)}</b> <code>#{task.id}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━\n"
+        f"{schedule_icon} {when} · {task.timezone}\n"
+        f"{status_line}\n\n"
+        f"📝 {escape_html(prompt_display)}"
     )
 
 

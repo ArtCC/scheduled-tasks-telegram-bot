@@ -18,12 +18,19 @@ logging.basicConfig(
 
 # Commands shown in the Telegram menu
 BOT_COMMANDS = [
-    BotCommand(command="start", description="Show welcome message and help"),
-    BotCommand(command="help", description="Show available commands"),
-    BotCommand(command="ask", description="Ask something right now"),
-    BotCommand(command="add", description="Schedule a new task"),
-    BotCommand(command="list", description="List your scheduled tasks"),
-    BotCommand(command="delete", description="Delete a task by ID"),
+    BotCommand(command="start", description="👋 Welcome & help"),
+    BotCommand(command="help", description="📖 Show all commands"),
+    BotCommand(command="ask", description="💬 Ask something now"),
+    BotCommand(command="add", description="📅 Schedule a task"),
+    BotCommand(command="every", description="⏱️ Interval task (2h, 30m)"),
+    BotCommand(command="remember", description="🔔 Simple reminder"),
+    BotCommand(command="list", description="📋 View all tasks"),
+    BotCommand(command="run", description="▶️ Execute task now"),
+    BotCommand(command="edit", description="✏️ Edit task prompt"),
+    BotCommand(command="pause", description="⏸️ Pause a task"),
+    BotCommand(command="resume", description="▶️ Resume task"),
+    BotCommand(command="delete", description="🗑️ Delete a task"),
+    BotCommand(command="status", description="📊 Bot status"),
 ]
 
 
