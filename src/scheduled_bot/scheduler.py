@@ -99,12 +99,8 @@ class BotScheduler:
                     parse_mode=ParseMode.MARKDOWN_V2,
                 )
             except TelegramBadRequest as md_err:
-                # OpenAI may produce invalid MarkdownV2; fallback to plain text
-                logger.warning(
-                    "MarkdownV2 parse error for task %s: %s. Sending as plain text.",
-                    task.id,
-                    md_err,
-                )
+                # LLMs aren't perfect with MarkdownV2 escaping; fallback to plain text
+                logger.debug("MarkdownV2 fallback for task %s: %s", task.id, md_err)
                 await self.bot.send_message(
                     chat_id=task.chat_id,
                     text=content,

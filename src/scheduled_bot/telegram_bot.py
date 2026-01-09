@@ -87,9 +87,10 @@ async def handle_ask(message: Message) -> None:
 
         try:
             await message.answer(content, parse_mode=ParseMode.MARKDOWN_V2)
-        except TelegramBadRequest:
+        except TelegramBadRequest as e:
             # Fallback to plain text if MarkdownV2 parsing fails
-            logger.warning("MarkdownV2 parse error for /ask. Sending as plain text.")
+            # This is expected sometimes as LLMs aren't perfect with escaping
+            logger.debug("MarkdownV2 fallback for /ask: %s", e)
             await message.answer(content, parse_mode=None)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process /ask: %s", exc)
