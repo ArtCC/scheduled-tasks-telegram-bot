@@ -48,9 +48,7 @@ def get_settings(env_file: Optional[str] = None) -> Settings:
         timezone=os.getenv("TIMEZONE", Settings.timezone),
         database_path=database_path,
         openai_max_tokens=int(os.getenv("OPENAI_MAX_TOKENS", Settings.openai_max_tokens)),
-        openai_temperature=float(
-            os.getenv("OPENAI_TEMPERATURE", Settings.openai_temperature)
-        ),
+        openai_temperature=float(os.getenv("OPENAI_TEMPERATURE", Settings.openai_temperature)),
         max_prompt_chars=int(os.getenv("MAX_PROMPT_CHARS", Settings.max_prompt_chars)),
         response_max_chars=int(os.getenv("MAX_RESPONSE_CHARS", Settings.response_max_chars)),
         openai_max_retries=int(os.getenv("OPENAI_MAX_RETRIES", Settings.openai_max_retries)),

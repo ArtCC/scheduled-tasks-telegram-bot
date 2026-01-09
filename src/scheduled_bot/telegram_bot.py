@@ -84,9 +84,7 @@ async def handle_list(message: Message) -> None:
     lines = []
     for task in tasks:
         when = (
-            task.run_at.isoformat()
-            if task.run_at
-            else f"{task.hour:02d}:{task.minute:02d} diario"
+            task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} diario"
         )
         lines.append(f"#{task.id}: {when} ({task.timezone}) -> {task.prompt}")
     await message.answer(escape_markdown_v2("\n".join(lines)))

@@ -75,9 +75,7 @@ class TaskStorage:
             return [self._row_to_task(row) for row in rows]
 
     def _row_to_task(self, row: sqlite3.Row) -> Task:
-        run_at = (
-            datetime.fromisoformat(row["run_at"]) if row["run_at"] is not None else None
-        )
+        run_at = datetime.fromisoformat(row["run_at"]) if row["run_at"] is not None else None
         return Task(
             id=row["id"],
             chat_id=row["chat_id"],

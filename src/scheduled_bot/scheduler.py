@@ -111,9 +111,7 @@ class BotScheduler:
         )
 
 
-def parse_time_spec(
-    time_spec: str, timezone_name: str
-) -> Tuple[int, int, datetime | None, str]:
+def parse_time_spec(time_spec: str, timezone_name: str) -> Tuple[int, int, datetime | None, str]:
     cleaned = time_spec.strip()
     target_tz = _get_zoneinfo(timezone_name)
 
