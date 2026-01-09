@@ -94,9 +94,10 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 | `/list` | List all tasks with interactive buttons |
 | `/run <id>` | Execute a task immediately |
 | `/edit <id> <new prompt>` | Edit an existing task's prompt |
+| `/clone <id>` | Duplicate an existing task |
 | `/pause <id>` | Pause a task (won't run until resumed) |
 | `/resume <id>` | Resume a paused task |
-| `/delete <id>` | Delete a task permanently |
+| `/delete <id>` | Delete a task (with confirmation) |
 | `/status` | Show bot status and next scheduled run |
 | `/start`, `/help` | Show help message |
 

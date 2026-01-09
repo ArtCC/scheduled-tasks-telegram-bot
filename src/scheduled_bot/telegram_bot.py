@@ -75,6 +75,7 @@ async def handle_start(message: Message) -> None:
         "├ /list — View all tasks\n"
         "├ /run &lt;id&gt; — Execute now\n"
         "├ /edit &lt;id&gt; &lt;new prompt&gt;\n"
+        "├ /clone &lt;id&gt; — Duplicate a task\n"
         "├ /pause &lt;id&gt; · /resume &lt;id&gt;\n"
         "└ /delete &lt;id&gt;\n\n"
         "📊 <b>Info</b>\n"
@@ -584,7 +585,38 @@ async def callback_resume(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("delete:"))
 async def callback_delete(callback: CallbackQuery) -> None:
-    """Handle delete button callback."""
+    """Handle delete button - show confirmation."""
+    scheduler = _get_scheduler()
+    task_id = int(callback.data.split(":")[1])
+    chat_id = callback.message.chat.id
+
+    task = scheduler.storage.get_task(task_id, chat_id)
+    if not task:
+        await callback.answer("Task not found", show_alert=True)
+        return
+
+    # Show confirmation keyboard
+    confirm_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Yes, delete", callback_data=f"confirm_delete:{task_id}"
+                ),
+                InlineKeyboardButton(text="❌ Cancel", callback_data=f"cancel_delete:{task_id}"),
+            ]
+        ]
+    )
+    await callback.answer()
+    await callback.message.edit_text(
+        f"⚠️ <b>Delete {task.display_name}?</b>\n\n" f"This action cannot be undone.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=confirm_keyboard,
+    )
+
+
+@router.callback_query(F.data.startswith("confirm_delete:"))
+async def callback_confirm_delete(callback: CallbackQuery) -> None:
+    """Handle confirmed deletion."""
     scheduler = _get_scheduler()
     task_id = int(callback.data.split(":")[1])
     chat_id = callback.message.chat.id
@@ -595,6 +627,27 @@ async def callback_delete(callback: CallbackQuery) -> None:
         await callback.message.delete()
     else:
         await callback.answer("Task not found", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("cancel_delete:"))
+async def callback_cancel_delete(callback: CallbackQuery) -> None:
+    """Handle cancelled deletion - restore task view."""
+    scheduler = _get_scheduler()
+    task_id = int(callback.data.split(":")[1])
+    chat_id = callback.message.chat.id
+
+    task = scheduler.storage.get_task(task_id, chat_id)
+    if not task:
+        await callback.answer("Task not found", show_alert=True)
+        return
+
+    await callback.answer("Cancelled")
+    text = _format_task_text(task)
+    await callback.message.edit_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=_build_task_keyboard(task),
+    )
 
 
 @router.callback_query(F.data.startswith("run:"))
@@ -666,6 +719,56 @@ async def handle_edit(message: Message) -> None:
         await message.answer(f"✏️ Task #{task_id} updated")
     else:
         await message.answer("Task not found")
+
+
+@router.message(Command("clone"))
+async def handle_clone(message: Message) -> None:
+    """Clone an existing task."""
+    scheduler = _get_scheduler()
+    parts = (message.text or "").split(maxsplit=1)
+
+    if len(parts) < 2:
+        await message.answer("Usage: /clone &lt;id&gt;")
+        return
+
+    try:
+        task_id = int(parts[1])
+    except ValueError:
+        await message.answer("The id must be numeric")
+        return
+
+    original = scheduler.storage.get_task(task_id, message.chat.id)
+    if not original:
+        await message.answer("Task not found")
+        return
+
+    # Create a copy of the task
+    from .models import Task
+
+    new_task = Task(
+        id=None,
+        chat_id=original.chat_id,
+        prompt=original.prompt,
+        hour=original.hour,
+        minute=original.minute,
+        timezone=original.timezone,
+        run_at=original.run_at,
+        paused=False,  # New task starts active
+        interval_minutes=original.interval_minutes,
+        name=f"{original.name} (copy)" if original.name else None,
+        days_of_week=original.days_of_week,
+        is_reminder=original.is_reminder,
+    )
+
+    new_task = scheduler.storage.add_task(new_task)
+    scheduler._schedule_task(new_task)
+
+    await message.answer(
+        f"📋 Task cloned!\\n\\n"
+        f"Original: <b>#{original.id}</b>\\n"
+        f"New: <b>#{new_task.id}</b> ({new_task.display_name})",
+        parse_mode=ParseMode.HTML,
+    )
 
 
 @router.message(Command("pause"))

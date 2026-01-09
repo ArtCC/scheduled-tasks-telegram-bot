@@ -27,6 +27,7 @@ BOT_COMMANDS = [
     BotCommand(command="list", description="📋 View all tasks"),
     BotCommand(command="run", description="▶️ Execute task now"),
     BotCommand(command="edit", description="✏️ Edit task prompt"),
+    BotCommand(command="clone", description="📋 Duplicate a task"),
     BotCommand(command="pause", description="⏸️ Pause a task"),
     BotCommand(command="resume", description="▶️ Resume task"),
     BotCommand(command="delete", description="🗑️ Delete a task"),
