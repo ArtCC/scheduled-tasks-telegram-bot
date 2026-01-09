@@ -1,7 +1,7 @@
-from scheduled_bot.formatting import escape_markdown_v2
+from scheduled_bot.formatting import escape_html
 
 
-def test_escape_markdown_v2():
-    text = "Special _characters_ need *escaping*"
-    escaped = escape_markdown_v2(text)
-    assert escaped == r"Special \_characters\_ need \*escaping\*"
+def test_escape_html():
+    text = "Special <characters> need & escaping"
+    escaped = escape_html(text)
+    assert escaped == "Special &lt;characters&gt; need &amp; escaping"
