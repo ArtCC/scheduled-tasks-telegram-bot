@@ -22,7 +22,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Normalize namespace to lowercase
-        run: echo "IMAGE_NAMESPACE=$(echo \"$IMAGE_NAMESPACE\" | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+        run: |
+          CLEAN_NAMESPACE=$(echo "${IMAGE_NAMESPACE}" | tr -d '"' | tr '[:upper:]' '[:lower:]')
+          echo "IMAGE_NAMESPACE=${CLEAN_NAMESPACE}" >> $GITHUB_ENV
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
