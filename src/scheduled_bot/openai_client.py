@@ -43,11 +43,26 @@ def _extract_response_text(response) -> str:
                         for content in item.content:
                             if hasattr(content, "type") and content.type == "output_text":
                                 if hasattr(content, "text"):
-                                    return content.text
+                                    text = content.text
+                                    # text might be a ResponseTextConfig object
+                                    if isinstance(text, str):
+                                        return text
+                                    # Try to get the actual string value
+                                    if hasattr(text, "value"):
+                                        return text.value
+                                    if hasattr(text, "content"):
+                                        return text.content
+                                    # Try string conversion
+                                    return str(text)
 
         # Alternative: check if response has text directly
         if hasattr(response, "text") and response.text:
-            return response.text
+            text = response.text
+            if isinstance(text, str):
+                return text
+            if hasattr(text, "value"):
+                return text.value
+            return str(text)
 
         logger.warning("Could not extract text from response: %s", type(response))
         logger.debug("Response attributes: %s", dir(response))
