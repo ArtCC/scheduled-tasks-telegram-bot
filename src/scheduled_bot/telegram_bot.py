@@ -99,8 +99,7 @@ async def handle_ask(message: Message) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process /ask: %s", exc)
         await message.answer(
-            "❌ <b>Error</b>\n\n"
-            "Could not process your request. Please try again later.",
+            "❌ <b>Error</b>\n\n" "Could not process your request. Please try again later.",
             parse_mode=ParseMode.HTML,
         )
 
@@ -131,8 +130,7 @@ async def handle_add(message: Message) -> None:
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to add task: %s", exc)
         await message.answer(
-            "❌ <b>Error</b>\n\n"
-            "Could not create the task. Check the format and try again.",
+            "❌ <b>Error</b>\n\n" "Could not create the task. Check the format and try again.",
             parse_mode=ParseMode.HTML,
         )
         return
