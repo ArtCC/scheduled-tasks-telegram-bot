@@ -100,7 +100,7 @@ async def handle_ask(message: Message) -> None:
         logger.exception("Failed to process /ask: %s", exc)
         await message.answer(
             "❌ <b>Error</b>\n\n"
-            "No pude procesar tu solicitud. Por favor, inténtalo de nuevo más tarde.",
+            "Could not process your request. Please try again later.",
             parse_mode=ParseMode.HTML,
         )
 
@@ -132,7 +132,7 @@ async def handle_add(message: Message) -> None:
         logger.exception("Failed to add task: %s", exc)
         await message.answer(
             "❌ <b>Error</b>\n\n"
-            "No pude crear la tarea. Verifica el formato y vuelve a intentarlo.",
+            "Could not create the task. Check the format and try again.",
             parse_mode=ParseMode.HTML,
         )
         return

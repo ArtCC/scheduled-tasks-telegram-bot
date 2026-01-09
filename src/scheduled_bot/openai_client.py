@@ -122,7 +122,7 @@ async def generate_html(prompt: str, settings: Settings) -> str:
                 response.status,
                 [{"type": getattr(item, "type", None)} for item in (response.output or [])],
             )
-            return "Lo siento, no pude generar una respuesta. Por favor, inténtalo de nuevo."
+            return "Sorry, I couldn't generate a response. Please try again."
 
         except retryable as exc:  # type: ignore[misc]
             last_exc = exc
