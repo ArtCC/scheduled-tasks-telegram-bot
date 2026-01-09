@@ -10,6 +10,8 @@ def escape_html(text: str) -> str:
 
 
 def clamp_message(text: str, max_chars: int, suffix: str = " …[truncated]") -> str:
+    """Clamp message length ensuring string conversion first."""
+    text = str(text)
     if len(text) <= max_chars:
         return text
 
