@@ -48,9 +48,7 @@ async def handle_add(message: Message) -> None:
 
     if len(prompt) > settings.max_prompt_chars:
         await message.answer(
-            escape_markdown_v2(
-                f"Prompt too long. Maximum {settings.max_prompt_chars} characters."
-            )
+            escape_markdown_v2(f"Prompt too long. Maximum {settings.max_prompt_chars} characters.")
         )
         return
 
