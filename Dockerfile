@@ -8,7 +8,7 @@ WORKDIR /app
 
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir --retries 3 --timeout 60 -r requirements.txt
 
 COPY src ./src
 COPY pyproject.toml ruff.toml ./
