@@ -89,6 +89,7 @@ async def generate_html(prompt: str, settings: Settings) -> str:
         "input": user_input,
         "tools": [{"type": "web_search_preview"}],
         "max_output_tokens": settings.openai_max_tokens,
+        "response_format": {"type": "text"},
     }
 
     # Only add temperature for models that support it (not gpt-5-mini)
