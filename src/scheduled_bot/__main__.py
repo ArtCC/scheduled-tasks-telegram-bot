@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot
+from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 
 from .config import get_settings
@@ -17,12 +18,15 @@ logging.basicConfig(
 
 async def main() -> None:
     settings = get_settings()
-    bot = Bot(token=settings.bot_token, parse_mode=ParseMode.MARKDOWN_V2)
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN_V2),
+    )
     storage = TaskStorage(settings.database_path)
     scheduler = BotScheduler(bot=bot, storage=storage, settings=settings)
     scheduler.start()
 
-    dispatcher = build_dispatcher(bot, scheduler)
+    dispatcher = build_dispatcher(scheduler)
     await dispatcher.start_polling(bot)
 
 

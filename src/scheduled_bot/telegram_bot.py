@@ -1,6 +1,6 @@
 from typing import List
 
-from aiogram import Bot, Dispatcher, Router
+from aiogram import Dispatcher, Router
 from aiogram.filters import Command
 from aiogram.types import Message
 
@@ -9,12 +9,14 @@ from .scheduler import BotScheduler
 
 router = Router()
 
+# Global reference set by build_dispatcher
+_scheduler: BotScheduler | None = None
 
-def _get_scheduler(message: Message) -> BotScheduler:
-    scheduler = message.bot.get("scheduler")
-    if not scheduler:
+
+def _get_scheduler() -> BotScheduler:
+    if not _scheduler:
         raise RuntimeError("Scheduler is not configured")
-    return scheduler  # type: ignore[return-value]
+    return _scheduler
 
 
 @router.message(Command("start", "help"))
@@ -31,7 +33,7 @@ async def handle_start(message: Message) -> None:
 
 @router.message(Command("add"))
 async def handle_add(message: Message) -> None:
-    scheduler = _get_scheduler(message)
+    scheduler = _get_scheduler()
     settings = scheduler.settings
     parts = (message.text or "").split(maxsplit=3)
     if len(parts) < 3:
@@ -73,7 +75,7 @@ async def handle_add(message: Message) -> None:
 
 @router.message(Command("list"))
 async def handle_list(message: Message) -> None:
-    scheduler = _get_scheduler(message)
+    scheduler = _get_scheduler()
     tasks: List = scheduler.storage.list_tasks(message.chat.id)
     if not tasks:
         await message.answer("You have no tasks.")
@@ -90,7 +92,7 @@ async def handle_list(message: Message) -> None:
 
 @router.message(Command("delete"))
 async def handle_delete(message: Message) -> None:
-    scheduler = _get_scheduler(message)
+    scheduler = _get_scheduler()
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
         await message.answer("Usage: /delete <id>")
@@ -109,8 +111,9 @@ async def handle_delete(message: Message) -> None:
         await message.answer("Task not found")
 
 
-def build_dispatcher(bot: Bot, scheduler: BotScheduler) -> Dispatcher:
+def build_dispatcher(scheduler: BotScheduler) -> Dispatcher:
+    global _scheduler
+    _scheduler = scheduler
     dispatcher = Dispatcher()
-    bot["scheduler"] = scheduler
     dispatcher.include_router(router)
     return dispatcher
