@@ -68,6 +68,7 @@ async def handle_start(message: Message) -> None:
         "/add HH:MM [TZ] [days] [--name=X] &lt;request&gt; - Daily task\n"
         "/add YYYY-MM-DDTHH:MM &lt;request&gt; - One-time task\n"
         "/every &lt;interval&gt; &lt;request&gt; - Interval task\n"
+        "/remember HH:MM [TZ] [days] &lt;text&gt; - Simple reminder\n"
         "/list - Show your scheduled tasks\n"
         "/run &lt;id&gt; - Run a task now\n"
         "/edit &lt;id&gt; &lt;new prompt&gt; - Edit a task\n"
@@ -78,7 +79,8 @@ async def handle_start(message: Message) -> None:
         "<b>Examples:</b>\n"
         "/add 08:00 Europe/Madrid Weather summary\n"
         "/add 09:00 mon,wed,fri Weekly standup notes\n"
-        "/add 08:00 --name=News Daily headlines\n"
+        "/remember 09:00 Take medication\n"
+        "/remember 2026-03-15T10:00 Doctor appointment\n"
         "/every 2h Check server status"
     )
     await message.answer(text, parse_mode=ParseMode.HTML)
@@ -220,6 +222,107 @@ async def handle_add(message: Message) -> None:
         msg = (
             f"✅ <b>{escape_html(task_name)}</b> created.\n"
             f"Runs daily at {run_info} ({task.timezone})"
+        )
+
+    await message.answer(msg, parse_mode=ParseMode.HTML)
+
+
+@router.message(Command("remember"))
+async def handle_remember(message: Message) -> None:
+    """
+    Handle /remember command - simple reminders without OpenAI.
+    /remember HH:MM [TZ] [days] <text>
+    /remember YYYY-MM-DDTHH:MM <text>
+    """
+    scheduler = _get_scheduler()
+    settings = scheduler.settings
+    text = (message.text or "").strip()
+
+    parts = text.split()
+    if len(parts) < 3:
+        await message.answer(
+            "Usage: /remember HH:MM [TZ] [days] &lt;text&gt;\n"
+            "Examples:\n"
+            "  /remember 09:00 Take medication\n"
+            "  /remember 08:00 Europe/Madrid Call mom\n"
+            "  /remember 09:00 mon,wed,fri Team meeting\n"
+            "  /remember 2026-03-15T10:00 Doctor appointment"
+        )
+        return
+
+    time_spec = parts[1]
+    tz_name = None
+    days_of_week = None
+
+    # Parse remaining arguments
+    idx = 2
+    reminder_parts = []
+
+    while idx < len(parts):
+        token = parts[idx]
+
+        # Check if it's a timezone (contains '/')
+        if "/" in token and tz_name is None and not days_of_week:
+            tz_name = token
+            idx += 1
+            continue
+
+        # Check if it's days specification
+        if days_of_week is None and re.match(r"^[a-z,]+$", token.lower()):
+            try:
+                days_of_week = parse_days(token)
+                idx += 1
+                continue
+            except ValueError:
+                pass
+
+        # Rest is the reminder text
+        reminder_parts = parts[idx:]
+        break
+
+    reminder_text = " ".join(reminder_parts)
+
+    if not reminder_text:
+        await message.answer("Please provide text for the reminder.")
+        return
+
+    if len(reminder_text) > settings.max_prompt_chars:
+        await message.answer(f"Reminder too long. Maximum {settings.max_prompt_chars} characters.")
+        return
+
+    try:
+        task = await scheduler.add_task(
+            message.chat.id,
+            time_spec,
+            reminder_text,
+            tz_name,
+            name=None,
+            days_of_week=days_of_week,
+            is_reminder=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to add reminder: %s", exc)
+        await message.answer(
+            "❌ <b>Error</b>\n\n" "Could not create the reminder. Check the format and try again.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    # Build confirmation message
+    run_info = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d}"
+
+    if task.run_at:
+        msg = f"🔔 <b>Reminder #{task.id}</b> set for {run_info} ({task.timezone})."
+    elif task.days_of_week:
+        days_display = task.days_of_week.upper()
+        msg = (
+            f"🔔 <b>Reminder #{task.id}</b> created.\n"
+            f"Will remind you at {run_info} on {days_display} ({task.timezone})"
+        )
+    else:
+        msg = (
+            f"🔔 <b>Reminder #{task.id}</b> created.\n"
+            f"Will remind you daily at {run_info} ({task.timezone})"
         )
 
     await message.answer(msg, parse_mode=ParseMode.HTML)
@@ -386,9 +489,10 @@ def _format_task_text(task) -> str:
         when = f"{task.hour:02d}:{task.minute:02d} daily"
 
     status = "⏸️ " if task.paused else ""
+    icon = "🔔 " if task.is_reminder else ""
     task_name = task.display_name
     return (
-        f"{status}<b>{escape_html(task_name)}</b> (#{task.id}): "
+        f"{status}{icon}<b>{escape_html(task_name)}</b> (#{task.id}): "
         f"{when} ({task.timezone})\n{escape_html(task.prompt)}"
     )
 

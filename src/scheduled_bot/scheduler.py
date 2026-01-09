@@ -80,7 +80,22 @@ class BotScheduler:
         timezone_name: str | None = None,
         name: str | None = None,
         days_of_week: str | None = None,
+        is_reminder: bool = False,
     ) -> Task:
+        """Add a scheduled task.
+
+        Args:
+            chat_id: Telegram chat ID.
+            time_spec: Time specification (HH:MM or ISO datetime).
+            prompt: Text prompt for OpenAI or plain text for reminders.
+            timezone_name: Optional timezone override.
+            name: Optional task name.
+            days_of_week: Optional days restriction (e.g., 'mon,wed,fri').
+            is_reminder: If True, sends plain text without OpenAI.
+
+        Returns:
+            The created Task object.
+        """
         tz_name = timezone_name or self.settings.timezone
         task_time = parse_time_spec(time_spec, tz_name)
         task = Task(
@@ -93,6 +108,7 @@ class BotScheduler:
             run_at=task_time[2],
             name=name,
             days_of_week=days_of_week,
+            is_reminder=is_reminder,
         )
         task = self.storage.add_task(task)
         self._schedule_task(task)
@@ -184,6 +200,15 @@ class BotScheduler:
         return updated
 
     async def _execute_task(self, task: Task, manual: bool = False) -> None:
+        """Execute a scheduled task.
+
+        For regular tasks, calls OpenAI to generate a response.
+        For reminders (is_reminder=True), sends the plain text directly.
+
+        Args:
+            task: The task to execute.
+            manual: If True, skip the paused check (for /run command).
+        """
         # Refresh task state to check if paused (skip check for manual runs)
         if not manual:
             current_task = self.storage.get_task(task.id or 0, task.chat_id)
@@ -192,25 +217,33 @@ class BotScheduler:
                 return
 
         try:
-            # OpenAI is instructed to return HTML-formatted text,
-            # so we do NOT escape it here (escaping would break the formatting).
-            content = await generate_html(task.prompt, self.settings)
-            content = clamp_message(content, self.settings.response_max_chars)
-
-            try:
+            if task.is_reminder:
+                # Reminders: send plain text with a bell emoji prefix
+                content = f"🔔 <b>Reminder</b>\n\n{escape_html(task.prompt)}"
                 await self.bot.send_message(
                     chat_id=task.chat_id,
                     text=content,
                     parse_mode=ParseMode.HTML,
                 )
-            except TelegramBadRequest as html_err:
-                # LLMs may produce invalid HTML; fallback to plain text
-                logger.debug("HTML fallback for task %s: %s", task.id, html_err)
-                await self.bot.send_message(
-                    chat_id=task.chat_id,
-                    text=content,
-                    parse_mode=None,
-                )
+            else:
+                # Regular tasks: call OpenAI
+                content = await generate_html(task.prompt, self.settings)
+                content = clamp_message(content, self.settings.response_max_chars)
+
+                try:
+                    await self.bot.send_message(
+                        chat_id=task.chat_id,
+                        text=content,
+                        parse_mode=ParseMode.HTML,
+                    )
+                except TelegramBadRequest as html_err:
+                    # LLMs may produce invalid HTML; fallback to plain text
+                    logger.debug("HTML fallback for task %s: %s", task.id, html_err)
+                    await self.bot.send_message(
+                        chat_id=task.chat_id,
+                        text=content,
+                        parse_mode=None,
+                    )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to execute task %s: %s", task.id, exc)
             await self._notify_failure(task, exc)

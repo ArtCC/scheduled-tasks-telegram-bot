@@ -63,7 +63,8 @@ class TaskStorage:
                     paused INTEGER NOT NULL DEFAULT 0,
                     interval_minutes INTEGER,
                     name TEXT,
-                    days_of_week TEXT
+                    days_of_week TEXT,
+                    is_reminder INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
@@ -78,6 +79,8 @@ class TaskStorage:
                 conn.execute("ALTER TABLE tasks ADD COLUMN name TEXT")
             if "days_of_week" not in columns:
                 conn.execute("ALTER TABLE tasks ADD COLUMN days_of_week TEXT")
+            if "is_reminder" not in columns:
+                conn.execute("ALTER TABLE tasks ADD COLUMN is_reminder INTEGER NOT NULL DEFAULT 0")
             conn.commit()
 
     def add_task(self, task: Task) -> Task:
@@ -95,8 +98,8 @@ class TaskStorage:
                 """
                 INSERT INTO tasks
                     (chat_id, prompt, hour, minute, timezone, run_at,
-                     paused, interval_minutes, name, days_of_week)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                     paused, interval_minutes, name, days_of_week, is_reminder)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.chat_id,
@@ -109,6 +112,7 @@ class TaskStorage:
                     task.interval_minutes,
                     task.name,
                     task.days_of_week,
+                    1 if task.is_reminder else 0,
                 ),
             )
             conn.commit()
@@ -223,6 +227,8 @@ class TaskStorage:
             Task object populated with row data.
         """
         run_at = datetime.fromisoformat(row["run_at"]) if row["run_at"] is not None else None
+        # Handle is_reminder column which may not exist in older databases
+        is_reminder = bool(row["is_reminder"]) if "is_reminder" in row.keys() else False
         return Task(
             id=row["id"],
             chat_id=row["chat_id"],
@@ -235,4 +241,5 @@ class TaskStorage:
             interval_minutes=row["interval_minutes"],
             name=row["name"],
             days_of_week=row["days_of_week"],
+            is_reminder=is_reminder,
         )

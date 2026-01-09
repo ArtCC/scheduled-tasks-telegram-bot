@@ -21,6 +21,7 @@
 | 📆 **Specific days** | `/add 08:00 mon,wed,fri ...` — runs only on selected days |
 | ⏱️ **Interval tasks** | `/every 2h your request` — runs at fixed intervals |
 | 📅 **One-time tasks** | `/add 2026-12-31T23:00 message` — runs once at ISO datetime |
+| 🔔 **Simple reminders** | `/remember 09:00 text` — plain text reminders without AI |
 | 🏷️ **Task names** | `/add 08:00 --name=News ...` — give tasks friendly names |
 | 🌍 **Timezone support** | `/add 08:00 Europe/Madrid ...` — per-task timezone |
 | ⏸️ **Pause/Resume** | Pause tasks without deleting them |
@@ -83,6 +84,8 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 | `/add HH:MM [TZ] [days] [--name=X] <prompt>` | Create a scheduled task |
 | `/add YYYY-MM-DDTHH:MM [--name=X] <prompt>` | Create a one-time task (ISO 8601) |
 | `/every <interval> <prompt>` | Create an interval task (e.g., `2h`, `30m`, `1h30m`) |
+| `/remember HH:MM [TZ] [days] <text>` | Simple reminder (no AI, plain text) |
+| `/remember YYYY-MM-DDTHH:MM <text>` | One-time reminder |
 
 ### Task Management
 
@@ -109,6 +112,9 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 /add 2026-01-15T07:30 Create a checklist for today's meeting
 /every 2h Check server status and report issues
 /every 30m Get latest Bitcoin price
+/remember 09:00 Take medication
+/remember 08:00 mon,wed,fri Team meeting at 9am
+/remember 2026-03-15T10:00 Doctor appointment
 /run 1
 /edit 1 New prompt for the task
 /pause 2
