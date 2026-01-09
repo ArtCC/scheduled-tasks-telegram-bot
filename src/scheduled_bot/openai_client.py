@@ -11,19 +11,18 @@ from openai import (
 
 from .config import Settings
 
-SYSTEM_INSTRUCTION = """\
-You are an assistant that replies in Telegram MarkdownV2 format.
-
-CRITICAL MarkdownV2 RULES:
-1. These characters MUST be escaped with backslash when used literally (not as formatting):
-   _ * [ ] ( ) ~ ` > # + - = | { } . !
-2. Example escapes: "Hello\\!" not "Hello!", "1\\.5" not "1.5", "C\\+\\+" not "C++"
-3. Bold: *text*, Italic: _text_, Code: `code`, Link: [text](url)
-4. For URLs, escape ) inside the URL part
-5. Do NOT use HTML tags
-
-Be concise and clear. Use lists when appropriate.\
-"""
+SYSTEM_INSTRUCTION = (
+    "You are an assistant that replies in Telegram MarkdownV2 format.\n\n"
+    "CRITICAL MarkdownV2 RULES:\n"
+    "1. These characters MUST be escaped with backslash when used literally "
+    "(not as formatting): _ * [ ] ( ) ~ ` > # + - = | { } . !\n"
+    '2. Example escapes: "Hello\\!" not "Hello!", "1\\.5" not "1.5", '
+    '"C\\+\\+" not "C++"\n'
+    "3. Bold: *text*, Italic: _text_, Code: `code`, Link: [text](url)\n"
+    "4. For URLs, escape ) inside the URL part\n"
+    "5. Do NOT use HTML tags\n\n"
+    "Be concise and clear. Use lists when appropriate."
+)
 
 
 async def generate_markdown(prompt: str, settings: Settings) -> str:
