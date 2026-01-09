@@ -49,17 +49,23 @@ async def generate_html(prompt: str, settings: Settings) -> str:
     delay = 1.0
     last_exc: Exception | None = None
 
+    # Prepare parameters, conditionally including temperature
+    params = {
+        "model": settings.openai_model,
+        "instructions": SYSTEM_INSTRUCTION,
+        "input": user_input,
+        "tools": [{"type": "web_search_preview"}],
+        "max_output_tokens": settings.openai_max_tokens,
+    }
+
+    # Only add temperature for models that support it (not gpt-5-mini)
+    if not settings.openai_model.startswith("gpt-5"):
+        params["temperature"] = settings.openai_temperature
+
     for attempt in range(1, settings.openai_max_retries + 1):
         try:
             # Use Responses API with web search enabled
-            response = await client.responses.create(
-                model=settings.openai_model,
-                instructions=SYSTEM_INSTRUCTION,
-                input=user_input,
-                tools=[{"type": "web_search_preview"}],
-                max_output_tokens=settings.openai_max_tokens,
-                temperature=settings.openai_temperature,
-            )
+            response = await client.responses.create(**params)
             return _extract_response_text(response)
         except retryable as exc:  # type: ignore[misc]
             last_exc = exc
