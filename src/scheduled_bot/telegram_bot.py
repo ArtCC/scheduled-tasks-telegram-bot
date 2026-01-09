@@ -72,7 +72,9 @@ async def handle_ask(message: Message) -> None:
 
     if len(prompt) > settings.max_prompt_chars:
         await message.answer(
-            escape_markdown_v2(f"Question too long. Maximum {settings.max_prompt_chars} characters.")
+            escape_markdown_v2(
+                f"Question too long. Maximum {settings.max_prompt_chars} characters."
+            )
         )
         return
 
