@@ -2,10 +2,15 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Any, List
 
-from openai import APIConnectionError, APIError, APITimeoutError, AsyncOpenAI, RateLimitError
+from openai import (
+    APIConnectionError,
+    APIError,
+    APITimeoutError,
+    AsyncOpenAI,
+    RateLimitError,
+)
 
 from .config import Settings
-
 
 SYSTEM_INSTRUCTION = (
     "Eres un asistente que responde SIEMPRE en MarkdownV2 apto para Telegram. "
@@ -18,7 +23,7 @@ async def generate_markdown(prompt: str, settings: Settings) -> str:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     now = datetime.now(timezone.utc).isoformat()
-    messages: List[dict[str, Any]] = [
+    messages: list[dict[str, any]] = [
         {"role": "system", "content": SYSTEM_INSTRUCTION},
         {
             "role": "user",
