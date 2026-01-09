@@ -63,7 +63,10 @@ async def handle_add(message: Message) -> None:
     run_info = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d}"
     await message.answer(
         escape_markdown_v2(
-            f"Tarea #{task.id} creada. Ejecutaré tu solicitud cada día a {run_info} ({task.timezone})"
+            (
+                f"Tarea #{task.id} creada. Ejecutaré tu solicitud cada día a {run_info} "
+                f"({task.timezone})"
+            )
             if not task.run_at
             else f"Tarea única programada para {run_info} ({task.timezone})."
         )
