@@ -1,6 +1,5 @@
 import asyncio
 from datetime import datetime, timezone
-from typing import Any, List
 
 from openai import (
     APIConnectionError,
@@ -23,7 +22,7 @@ async def generate_markdown(prompt: str, settings: Settings) -> str:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     now = datetime.now(timezone.utc).isoformat()
-    messages: list[dict[str, any]] = [
+    messages = [
         {"role": "system", "content": SYSTEM_INSTRUCTION},
         {
             "role": "user",
