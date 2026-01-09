@@ -34,6 +34,11 @@ class BotScheduler:
     def _reload_tasks(self) -> None:
         for task in self.storage.load_all():
             self._schedule_task(task)
+            if task.paused:
+                try:
+                    self.scheduler.pause_job(task.job_id)
+                except Exception:  # noqa: BLE001
+                    pass
 
     def _schedule_task(self, task: Task) -> None:
         if task.id is None:
@@ -85,7 +90,47 @@ class BotScheduler:
                 logger.debug("Job %s was not found in scheduler", job_id)
         return removed
 
+    def pause_task(self, task_id: int, chat_id: int) -> bool:
+        """Pause a task. Returns True if successful."""
+        task = self.storage.get_task(task_id, chat_id)
+        if not task:
+            return False
+        if task.paused:
+            return True  # Already paused
+
+        updated = self.storage.set_paused(task_id, chat_id, True)
+        if updated:
+            job_id = f"task-{task_id}"
+            try:
+                self.scheduler.pause_job(job_id)
+            except Exception:  # noqa: BLE001
+                logger.debug("Job %s was not found in scheduler", job_id)
+        return updated
+
+    def resume_task(self, task_id: int, chat_id: int) -> bool:
+        """Resume a paused task. Returns True if successful."""
+        task = self.storage.get_task(task_id, chat_id)
+        if not task:
+            return False
+        if not task.paused:
+            return True  # Already running
+
+        updated = self.storage.set_paused(task_id, chat_id, False)
+        if updated:
+            job_id = f"task-{task_id}"
+            try:
+                self.scheduler.resume_job(job_id)
+            except Exception:  # noqa: BLE001
+                logger.debug("Job %s was not found in scheduler", job_id)
+        return updated
+
     async def _execute_task(self, task: Task) -> None:
+        # Refresh task state to check if paused
+        current_task = self.storage.get_task(task.id or 0, task.chat_id)
+        if current_task and current_task.paused:
+            logger.info("Task %s is paused, skipping execution", task.id)
+            return
+
         try:
             # OpenAI is instructed to return HTML-formatted text,
             # so we do NOT escape it here (escaping would break the formatting).

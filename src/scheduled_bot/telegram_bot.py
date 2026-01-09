@@ -60,6 +60,8 @@ async def handle_start(message: Message) -> None:
         "/add HH:MM [TZ] &lt;request&gt; - Schedule daily task\n"
         "/add YYYY-MM-DDTHH:MM &lt;request&gt; - One-time task\n"
         "/list - Show your scheduled tasks\n"
+        "/pause &lt;id&gt; - Pause a task\n"
+        "/resume &lt;id&gt; - Resume a paused task\n"
         "/delete &lt;id&gt; - Remove a task\n\n"
         "Example: /add 08:00 Europe/Madrid Weather summary"
     )
@@ -159,7 +161,10 @@ async def handle_list(message: Message) -> None:
         when = (
             task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
         )
-        lines.append(f"#{task.id}: {when} ({task.timezone}) -&gt; {escape_html(task.prompt)}")
+        status = "⏸️ " if task.paused else ""
+        lines.append(
+            f"{status}#{task.id}: {when} ({task.timezone}) -&gt; {escape_html(task.prompt)}"
+        )
     await message.answer("\n".join(lines))
 
 
@@ -180,6 +185,50 @@ async def handle_delete(message: Message) -> None:
     removed = scheduler.remove_task(task_id, message.chat.id)
     if removed:
         await message.answer(f"Task #{task_id} deleted")
+    else:
+        await message.answer("Task not found")
+
+
+@router.message(Command("pause"))
+async def handle_pause(message: Message) -> None:
+    """Pause a scheduled task."""
+    scheduler = _get_scheduler()
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer("Usage: /pause &lt;id&gt;")
+        return
+
+    try:
+        task_id = int(parts[1])
+    except ValueError:
+        await message.answer("The id must be numeric")
+        return
+
+    paused = scheduler.pause_task(task_id, message.chat.id)
+    if paused:
+        await message.answer(f"⏸️ Task #{task_id} paused")
+    else:
+        await message.answer("Task not found")
+
+
+@router.message(Command("resume"))
+async def handle_resume(message: Message) -> None:
+    """Resume a paused task."""
+    scheduler = _get_scheduler()
+    parts = (message.text or "").split(maxsplit=1)
+    if len(parts) < 2:
+        await message.answer("Usage: /resume &lt;id&gt;")
+        return
+
+    try:
+        task_id = int(parts[1])
+    except ValueError:
+        await message.answer("The id must be numeric")
+        return
+
+    resumed = scheduler.resume_task(task_id, message.chat.id)
+    if resumed:
+        await message.answer(f"▶️ Task #{task_id} resumed")
     else:
         await message.answer("Task not found")
 

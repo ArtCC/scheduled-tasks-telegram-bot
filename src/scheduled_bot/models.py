@@ -12,6 +12,7 @@ class Task:
     minute: int
     timezone: str
     run_at: Optional[datetime] = None
+    paused: bool = False
 
     @property
     def job_id(self) -> str:
