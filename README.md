@@ -4,7 +4,7 @@
 [![Docker](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml/badge.svg)](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-> Telegram bot to schedule AI-generated messages using the OpenAI API. Responses are delivered in Telegram MarkdownV2 format with APScheduler-based scheduling and SQLite persistence.
+> Telegram bot to schedule AI-generated messages using the OpenAI Responses API with web search capabilities. Responses are delivered in Telegram HTML format with APScheduler-based scheduling and SQLite persistence.
 
 ---
 
@@ -12,12 +12,15 @@
 
 | Feature | Description |
 |---------|-------------|
+| 🔍 **Web search** | Real-time data via OpenAI's web search tool |
+| 💬 **Instant queries** | `/ask question` — get answers immediately |
 | 🕐 **Daily schedules** | `/add 08:00 your request` — runs every day at that time |
-| 📅 **One-time tasks** | `/add 2025-12-31T23:00 message` — runs once at ISO datetime |
+| 📅 **One-time tasks** | `/add 2026-12-31T23:00 message` — runs once at ISO datetime |
 | 🌍 **Timezone support** | `/add 08:00 Europe/Madrid ...` — per-task timezone |
 | 🔒 **Private by default** | Only authorized chat IDs can use the bot |
 | 💾 **Persistent storage** | SQLite database survives container restarts |
 | 🐳 **Docker ready** | Pre-built image on GHCR, Portainer-friendly |
+| 🤖 **Flexible models** | Use any OpenAI model (gpt-4o, gpt-4.1-mini, gpt-5, etc.) |
 
 ---
 
@@ -64,6 +67,7 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 | Command | Description |
 |---------|-------------|
 | `/start`, `/help` | Show help message |
+| `/ask <question>` | Ask a question and get an instant response |
 | `/add HH:MM [TZ] prompt` | Create a daily scheduled task |
 | `/add YYYY-MM-DDTHH:MM prompt` | Create a one-time task (ISO 8601) |
 | `/list` | List all your tasks with IDs |
@@ -72,9 +76,10 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 ### Examples
 
 ```text
+/ask What's the latest news about AI?
 /add 08:00 Give me a daily weather summary for Madrid in 3 bullets.
 /add 09:15 Europe/London Summarize key crypto news in 5 bullets.
-/add 2025-01-10T07:30 Create a checklist for today's meeting.
+/add 2026-01-15T07:30 Create a checklist for today's meeting.
 ```
 
 > ⚠️ Timezones must be valid IANA names: `UTC`, `Europe/Madrid`, `America/New_York`, etc.
@@ -149,8 +154,8 @@ src/scheduled_bot/
 ├── __main__.py      # Entry point, bot bootstrap
 ├── telegram_bot.py  # Command handlers & auth middleware
 ├── scheduler.py     # APScheduler task management
-├── openai_client.py # OpenAI API with retry logic
-├── formatting.py    # MarkdownV2 escaping
+├── openai_client.py # OpenAI Responses API with web search
+├── formatting.py    # HTML escaping for Telegram
 ├── storage.py       # SQLite persistence
 ├── config.py        # Settings from environment
 └── models.py        # Data models
