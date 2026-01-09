@@ -32,6 +32,39 @@ SYSTEM_INSTRUCTION = (
 # fmt: on
 
 
+def _extract_response_text(response) -> str:
+    """Extract text from Responses API output in a robust way."""
+    # Try common attributes first
+    if hasattr(response, "output_text") and response.output_text:
+        if isinstance(response.output_text, str):
+            return response.output_text
+        if hasattr(response.output_text, "value"):
+            return response.output_text.value
+        return str(response.output_text)
+
+    if hasattr(response, "output") and response.output:
+        for item in response.output:
+            if getattr(item, "type", None) == "message":
+                for content in getattr(item, "content", []) or []:
+                    if getattr(content, "type", None) == "output_text":
+                        text = getattr(content, "text", None)
+                        if isinstance(text, str):
+                            return text
+                        if hasattr(text, "value"):
+                            return text.value
+                        if hasattr(text, "content"):
+                            return text.content
+                        return str(text)
+
+    # Fallback: check for generic text attribute
+    if hasattr(response, "text") and response.text:
+        return response.text if isinstance(response.text, str) else str(response.text)
+
+    logger.warning("Could not extract text from response: %s", type(response))
+    logger.debug("Response attributes: %s", dir(response))
+    return ""
+
+
 async def generate_html(prompt: str, settings: Settings) -> str:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -42,29 +75,25 @@ async def generate_html(prompt: str, settings: Settings) -> str:
     delay = 1.0
     last_exc: Exception | None = None
 
+    params = {
+        "model": settings.openai_model,
+        "instructions": SYSTEM_INSTRUCTION,
+        "input": user_input,
+        "tools": [{"type": "web_search"}],
+        "max_output_tokens": settings.openai_max_tokens,
+        "response_format": {"type": "text"},
+    }
+
+    if not settings.openai_model.startswith("gpt-5"):
+        params["temperature"] = settings.openai_temperature
+
     for attempt in range(1, settings.openai_max_retries + 1):
         try:
-            # Use Chat Completions with web search tool; model will handle search as needed
-            response = await client.chat.completions.create(
-                model=settings.openai_model,
-                messages=[
-                    {"role": "system", "content": SYSTEM_INSTRUCTION},
-                    {"role": "user", "content": user_input},
-                ],
-                tools=[{"type": "web_search"}],
-                temperature=(
-                    None
-                    if settings.openai_model.startswith("gpt-5")
-                    else settings.openai_temperature
-                ),
-                max_tokens=settings.openai_max_tokens,
-                response_format={"type": "text"},
-            )
-
-            text = response.choices[0].message.content
+            response = await client.responses.create(**params)
+            text = _extract_response_text(response)
 
             if not text:
-                logger.error("Empty response from OpenAI chat completion")
+                logger.error("Empty response from OpenAI Responses API")
                 return "Lo siento, no pude generar una respuesta. Por favor, inténtalo de nuevo."
 
             return text
