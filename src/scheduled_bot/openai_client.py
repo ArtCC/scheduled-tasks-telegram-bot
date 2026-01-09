@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from datetime import datetime, timezone
 
 from openai import (
@@ -10,6 +11,8 @@ from openai import (
 )
 
 from .config import Settings
+
+logger = logging.getLogger(__name__)
 
 # fmt: off
 SYSTEM_INSTRUCTION = (
@@ -31,11 +34,26 @@ SYSTEM_INSTRUCTION = (
 
 def _extract_response_text(response) -> str:
     """Extract text content from Responses API output."""
-    for item in response.output:
-        if item.type == "message":
-            for content in item.content:
-                if content.type == "output_text":
-                    return content.text
+    try:
+        # Try to extract from output items
+        if hasattr(response, "output") and response.output:
+            for item in response.output:
+                if hasattr(item, "type") and item.type == "message":
+                    if hasattr(item, "content") and item.content:
+                        for content in item.content:
+                            if hasattr(content, "type") and content.type == "output_text":
+                                if hasattr(content, "text"):
+                                    return content.text
+
+        # Alternative: check if response has text directly
+        if hasattr(response, "text") and response.text:
+            return response.text
+
+        logger.warning("Could not extract text from response: %s", type(response))
+        logger.debug("Response attributes: %s", dir(response))
+    except Exception as e:
+        logger.error("Error extracting response text: %s", e)
+
     return ""
 
 
@@ -66,7 +84,14 @@ async def generate_html(prompt: str, settings: Settings) -> str:
         try:
             # Use Responses API with web search enabled
             response = await client.responses.create(**params)
-            return _extract_response_text(response)
+            text = _extract_response_text(response)
+
+            if not text:
+                logger.error("Empty response from OpenAI. Response type: %s", type(response))
+                # Fallback message
+                return "Lo siento, no pude generar una respuesta. Por favor, inténtalo de nuevo."
+
+            return text
         except retryable as exc:  # type: ignore[misc]
             last_exc = exc
             if attempt == settings.openai_max_retries:

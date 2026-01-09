@@ -98,7 +98,11 @@ async def handle_ask(message: Message) -> None:
             await message.answer(content, parse_mode=None)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process /ask: %s", exc)
-        await message.answer(f"Error: {escape_html(str(exc))}")
+        await message.answer(
+            "❌ <b>Error</b>\n\n"
+            "No pude procesar tu solicitud. Por favor, inténtalo de nuevo más tarde.",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 @router.message(Command("add"))
@@ -125,7 +129,12 @@ async def handle_add(message: Message) -> None:
     try:
         task = await scheduler.add_task(message.chat.id, time_spec, prompt, tz_name)
     except Exception as exc:  # noqa: BLE001
-        await message.answer(f"Could not create task: {escape_html(str(exc))}")
+        logger.exception("Failed to add task: %s", exc)
+        await message.answer(
+            "❌ <b>Error</b>\n\n"
+            "No pude crear la tarea. Verifica el formato y vuelve a intentarlo.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     run_info = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d}"
