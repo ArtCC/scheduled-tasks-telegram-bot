@@ -11,9 +11,9 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 
 from .config import Settings
-from .formatting import clamp_message, escape_markdown_v2
+from .formatting import clamp_message, escape_html
 from .models import Task
-from .openai_client import generate_markdown
+from .openai_client import generate_html
 from .storage import TaskStorage
 
 logger = logging.getLogger(__name__)
@@ -87,20 +87,20 @@ class BotScheduler:
 
     async def _execute_task(self, task: Task) -> None:
         try:
-            # OpenAI is instructed to return MarkdownV2-formatted text,
+            # OpenAI is instructed to return HTML-formatted text,
             # so we do NOT escape it here (escaping would break the formatting).
-            content = await generate_markdown(task.prompt, self.settings)
+            content = await generate_html(task.prompt, self.settings)
             content = clamp_message(content, self.settings.response_max_chars)
 
             try:
                 await self.bot.send_message(
                     chat_id=task.chat_id,
                     text=content,
-                    parse_mode=ParseMode.MARKDOWN_V2,
+                    parse_mode=ParseMode.HTML,
                 )
-            except TelegramBadRequest as md_err:
-                # LLMs aren't perfect with MarkdownV2 escaping; fallback to plain text
-                logger.debug("MarkdownV2 fallback for task %s: %s", task.id, md_err)
+            except TelegramBadRequest as html_err:
+                # LLMs may produce invalid HTML; fallback to plain text
+                logger.debug("HTML fallback for task %s: %s", task.id, html_err)
                 await self.bot.send_message(
                     chat_id=task.chat_id,
                     text=content,
@@ -114,11 +114,11 @@ class BotScheduler:
                 self.remove_task(task.id or 0, task.chat_id)
 
     async def _notify_failure(self, task: Task, exc: Exception) -> None:
-        msg = f"Failed to generate response: {exc}"
+        msg = f"Failed to generate response: {escape_html(str(exc))}"
         await self.bot.send_message(
             chat_id=task.chat_id,
-            text=escape_markdown_v2(msg),
-            parse_mode=ParseMode.MARKDOWN_V2,
+            text=msg,
+            parse_mode=ParseMode.HTML,
         )
 
 

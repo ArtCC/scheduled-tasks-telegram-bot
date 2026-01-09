@@ -31,7 +31,7 @@ async def main() -> None:
     settings = get_settings()
     bot = Bot(
         token=settings.bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN_V2),
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
 
     # Set bot commands menu

@@ -13,23 +13,22 @@ from .config import Settings
 
 # fmt: off
 SYSTEM_INSTRUCTION = (
-    "You are an assistant that replies in Telegram MarkdownV2 format.\n\n"
-    "ESCAPE RULES (CRITICAL):\n"
-    "- These chars MUST be escaped with \\ when literal: "
-    "_ * [ ] ( ) ~ ` > # + - = | { } . ! \\\n"
-    "- In URLs inside [text](url), also escape ) and \\\n"
-    "- Inside `code` or ```pre```, only escape ` and \\\n\n"
-    "EXAMPLES:\n"
-    "- Correct: Hello\\! | 1\\.5 | C\\+\\+ | It\\'s | 10\\-15\n"
-    "- Bold: *bold* | Italic: _italic_ | Code: `code`\n"
-    "- Link: [Google](https://google\\.com)\n\n"
-    "FORBIDDEN: HTML tags, unescaped special chars.\n"
-    "Be concise. Use bullet lists when helpful."
+    "You are an assistant that replies in Telegram HTML format.\n\n"
+    "ALLOWED TAGS:\n"
+    "- <b>bold</b>, <i>italic</i>, <u>underline</u>, <s>strikethrough</s>\n"
+    "- <code>inline code</code>, <pre>code block</pre>\n"
+    "- <a href='url'>link</a>\n"
+    "- <tg-spoiler>spoiler</tg-spoiler>\n\n"
+    "RULES:\n"
+    "- Escape < > & as &lt; &gt; &amp; when used literally\n"
+    "- Do NOT use Markdown syntax like *bold* or _italic_\n"
+    "- Do NOT use unsupported tags (div, span, p, br, etc.)\n\n"
+    "Be concise and clear. Use bullet points when helpful."
 )
 # fmt: on
 
 
-async def generate_markdown(prompt: str, settings: Settings) -> str:
+async def generate_html(prompt: str, settings: Settings) -> str:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     now = datetime.now(timezone.utc).isoformat()

@@ -1,19 +1,12 @@
-import re
-
-# Characters requiring escape in Telegram MarkdownV2
-# According to Telegram docs: _ * [ ] ( ) ~ ` > # + - = | { } . !
-# Also backslash \ must be escaped first
-_MARKDOWN_V2_SPECIALS = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
+import html
 
 
-def escape_markdown_v2(text: str) -> str:
-    """Escape all MarkdownV2 special characters.
+def escape_html(text: str) -> str:
+    """Escape HTML special characters for Telegram.
 
-    According to Telegram Bot API docs, these characters must be escaped
-    with a preceding backslash: _ * [ ] ( ) ~ ` > # + - = | { } . !
-    The backslash itself must also be escaped.
+    Only < > & need to be escaped for Telegram HTML mode.
     """
-    return _MARKDOWN_V2_SPECIALS.sub(r"\\\1", text)
+    return html.escape(text)
 
 
 def clamp_message(text: str, max_chars: int, suffix: str = " …[truncated]") -> str:
