@@ -8,7 +8,7 @@ def escape_markdown_v2(text: str) -> str:
     return _MARKDOWN_V2_SPECIALS.sub(r"\\\1", text)
 
 
-def clamp_message(text: str, max_chars: int, suffix: str = " …[truncado]") -> str:
+def clamp_message(text: str, max_chars: int, suffix: str = " …[truncated]") -> str:
     if len(text) <= max_chars:
         return text
 

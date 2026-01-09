@@ -12,9 +12,9 @@ from openai import (
 from .config import Settings
 
 SYSTEM_INSTRUCTION = (
-    "Eres un asistente que responde SIEMPRE en MarkdownV2 apto para Telegram. "
-    "Responde de forma concisa y clara, usa listas y tablas compactas cuando tenga sentido. "
-    "No incluyas código HTML ni enlaces rotos. Evita texto excesivamente largo."
+    "You are an assistant that ALWAYS replies in Telegram-compatible MarkdownV2. "
+    "Be concise and clear, use compact lists and tables when appropriate. "
+    "Do not include HTML code or broken links. Avoid excessively long text."
 )
 
 
@@ -27,10 +27,10 @@ async def generate_markdown(prompt: str, settings: Settings) -> str:
         {
             "role": "user",
             "content": (
-                "Momento de ejecución (UTC): "
-                f"{now}. Zona horaria objetivo: {settings.timezone}. "
-                "Responde en MarkdownV2 de Telegram. "
-                f"Solicitud: {prompt}"
+                "Execution time (UTC): "
+                f"{now}. Target timezone: {settings.timezone}. "
+                "Reply in Telegram MarkdownV2. "
+                f"Request: {prompt}"
             ),
         },
     ]
@@ -57,4 +57,4 @@ async def generate_markdown(prompt: str, settings: Settings) -> str:
 
     if last_exc:
         raise last_exc
-    raise RuntimeError("No se pudo generar la respuesta")
+    raise RuntimeError("Could not generate response")

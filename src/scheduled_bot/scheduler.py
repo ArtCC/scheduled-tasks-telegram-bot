@@ -125,10 +125,10 @@ def parse_time_spec(time_spec: str, timezone_name: str) -> Tuple[int, int, datet
 
     parts = cleaned.split(":")
     if len(parts) != 2:
-        raise ValueError("Formato de hora inválido. Usa HH:MM o ISO 8601.")
+        raise ValueError("Invalid time format. Use HH:MM or ISO 8601.")
     hour, minute = int(parts[0]), int(parts[1])
     if not 0 <= hour <= 23 or not 0 <= minute <= 59:
-        raise ValueError("Hora o minuto fuera de rango")
+        raise ValueError("Hour or minute out of range")
     return hour, minute, None, timezone_name
 
 
@@ -137,5 +137,5 @@ def _get_zoneinfo(tz_name: str) -> ZoneInfo:
         return ZoneInfo(tz_name)
     except ZoneInfoNotFoundError as exc:
         raise ValueError(
-            "Zona horaria inválida. Usa una TZ IANA, p.ej. UTC, Europe/Madrid, America/New_York."
+            "Invalid timezone. Use an IANA TZ, e.g. UTC, Europe/Madrid, America/New_York."
         ) from exc

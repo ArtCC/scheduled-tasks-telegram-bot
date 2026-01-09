@@ -29,7 +29,7 @@ def test_parse_time_spec_with_timezone_override():
 def test_parse_time_spec_invalid_timezone():
     with pytest.raises(ValueError) as err:
         parse_time_spec("08:00", "Invalid/Zone")
-    assert "Zona horaria inválida" in str(err.value)
+    assert "Invalid timezone" in str(err.value)
 
 
 def test_parse_time_spec_once_with_zulu():

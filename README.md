@@ -61,35 +61,59 @@ Notes:
 
 ### Length and format
 - The bot enforces Telegram MarkdownV2 and escapes special characters automatically.
-- Prompt and response lengths are capped; long responses are truncated with the suffix `…[truncado]`.
+- Prompt and response lengths are capped; long responses are truncated with the suffix `…[truncated]`.
 
 ## Docker deployment
-1) Copy `.env.example` to `.env` and fill values.
-2) Build and start with compose:
+
+The default [docker-compose.yml](docker-compose.yml) pulls from the public GHCR image `ghcr.io/artcc/scheduled-tasks-telegram-bot:latest`.
+
+### Option A: Using environment variables (recommended for Portainer)
+
+The compose file uses `${VAR:-default}` syntax, perfect for Portainer stacks:
+
+1. In **Portainer → Stacks → Add stack**, paste the compose content or import from Git.
+2. Add environment variables in the **Environment variables** section:
+   - `BOT_TOKEN` (required): your Telegram bot token.
+   - `OPENAI_API_KEY` (required): your OpenAI API key.
+   - Others are optional (defaults already set).
+3. Deploy the stack.
+
+### Option B: Using .env file locally
+
+1. Copy `.env.example` to `.env` and fill values.
+2. Create a compose override to use env_file:
+```yaml
+# docker-compose.override.yml
+services:
+  bot:
+    env_file:
+      - .env
 ```
-docker compose up --build -d
+3. Run:
+```bash
+docker compose up -d
 ```
-3) Logs:
+
+### Building locally (development)
+
+If you want to build from source instead of pulling from GHCR:
+```bash
+docker compose build
+docker compose up -d
 ```
+
+### Logs
+```bash
 docker compose logs -f
 ```
 
-Base image: [Dockerfile](Dockerfile). Compose service: [docker-compose.yml](docker-compose.yml).
+### Pull latest image
+```bash
+docker compose pull
+docker compose up -d
+```
 
-### Using the published GHCR image
-- Expected image: `ghcr.io/<your-user>/scheduled-tasks-telegram-bot:latest` (or the tag you publish).
-- Pull directly:
-```
-docker pull ghcr.io/<your-user>/scheduled-tasks-telegram-bot:latest
-```
-- In `docker-compose.yml`, replace the build section with:
-```
-  image: ghcr.io/<your-user>/scheduled-tasks-telegram-bot:latest
-```
-- If the repo is public, no login is needed. If private, log in first:
-```
-echo $GITHUB_TOKEN | docker login ghcr.io -u <your-user> --password-stdin
-```
+Base image: [Dockerfile](Dockerfile). Compose service: [docker-compose.yml](docker-compose.yml).
 
 ## Project structure
 - [src/scheduled_bot/__main__.py](src/scheduled_bot/__main__.py): bot and scheduler bootstrap.
@@ -101,7 +125,11 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u <your-user> --password-stdin
 - [tests](tests): basic tests.
 
 ## CI
-GitHub Actions workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint (ruff), format (black), and tests. Workflow [.github/workflows/publish.yml](.github/workflows/publish.yml) builds and pushes the Docker image to GHCR on main/master and tags.
+GitHub Actions workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint (ruff), format check (black), and tests on every push/PR.
+
+Workflow [.github/workflows/publish.yml](.github/workflows/publish.yml) builds and pushes the Docker image to GHCR automatically on:
+- Push to `main` or `master` branch → tagged as `latest`
+- Git tags (`v*`) → tagged with version number
 
 ## License
 Apache-2.0 (see [LICENSE](LICENSE)).
@@ -109,4 +137,4 @@ Apache-2.0 (see [LICENSE](LICENSE)).
 ---
 
 <sub>Arturo Carretero Calvo - 2026</sub>
-<sub>100% built with GitHub Copilot (model GPT-5.1-Codex-Max)</sub>
+<sub>100% built with GitHub Copilot (Claude Opus 4.5)</sub>

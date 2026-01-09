@@ -20,11 +20,11 @@ def _get_scheduler(message: Message) -> BotScheduler:
 @router.message(Command("start", "help"))
 async def handle_start(message: Message) -> None:
     text = (
-        "Hola! Soy tu bot de tareas programadas.\n\n"
-        "Usa /add HH:MM [ZonaHoraria] tu solicitud para recibirla cada día.\n"
-        "Ejemplo: /add 08:00 Europe/Madrid Resumen del clima.\n\n"
-        "Para una ejecución única, usa /add YYYY-MM-DDTHH:MM tu solicitud (ISO 8601).\n"
-        "Comandos: /add, /list, /delete <id>."
+        "Hi! I'm your scheduled tasks bot.\n\n"
+        "Use /add HH:MM [Timezone] your request to receive it daily.\n"
+        "Example: /add 08:00 Europe/Madrid Weather summary.\n\n"
+        "For a one-time run, use /add YYYY-MM-DDTHH:MM your request (ISO 8601).\n"
+        "Commands: /add, /list, /delete <id>."
     )
     await message.answer(escape_markdown_v2(text))
 
@@ -35,7 +35,7 @@ async def handle_add(message: Message) -> None:
     settings = scheduler.settings
     parts = (message.text or "").split(maxsplit=3)
     if len(parts) < 3:
-        await message.answer("Usa: /add HH:MM [ZonaHoraria] tu solicitud")
+        await message.answer("Usage: /add HH:MM [Timezone] your request")
         return
 
     time_spec = parts[1]
@@ -49,7 +49,7 @@ async def handle_add(message: Message) -> None:
     if len(prompt) > settings.max_prompt_chars:
         await message.answer(
             escape_markdown_v2(
-                f"El prompt es muy largo. Máximo {settings.max_prompt_chars} caracteres."
+                f"Prompt too long. Maximum {settings.max_prompt_chars} characters."
             )
         )
         return
@@ -57,18 +57,18 @@ async def handle_add(message: Message) -> None:
     try:
         task = await scheduler.add_task(message.chat.id, time_spec, prompt, tz_name)
     except Exception as exc:  # noqa: BLE001
-        await message.answer(escape_markdown_v2(f"No pude crear la tarea: {exc}"))
+        await message.answer(escape_markdown_v2(f"Could not create task: {exc}"))
         return
 
     run_info = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d}"
     await message.answer(
         escape_markdown_v2(
             (
-                f"Tarea #{task.id} creada. Ejecutaré tu solicitud cada día a {run_info} "
+                f"Task #{task.id} created. I'll run your request daily at {run_info} "
                 f"({task.timezone})"
             )
             if not task.run_at
-            else f"Tarea única programada para {run_info} ({task.timezone})."
+            else f"One-time task scheduled for {run_info} ({task.timezone})."
         )
     )
 
@@ -78,13 +78,13 @@ async def handle_list(message: Message) -> None:
     scheduler = _get_scheduler(message)
     tasks: List = scheduler.storage.list_tasks(message.chat.id)
     if not tasks:
-        await message.answer("No tienes tareas.")
+        await message.answer("You have no tasks.")
         return
 
     lines = []
     for task in tasks:
         when = (
-            task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} diario"
+            task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
         )
         lines.append(f"#{task.id}: {when} ({task.timezone}) -> {task.prompt}")
     await message.answer(escape_markdown_v2("\n".join(lines)))
@@ -95,20 +95,20 @@ async def handle_delete(message: Message) -> None:
     scheduler = _get_scheduler(message)
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
-        await message.answer("Usa: /delete <id>")
+        await message.answer("Usage: /delete <id>")
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("El id debe ser numérico")
+        await message.answer("The id must be numeric")
         return
 
     removed = scheduler.remove_task(task_id, message.chat.id)
     if removed:
-        await message.answer(escape_markdown_v2(f"Tarea #{task_id} eliminada"))
+        await message.answer(escape_markdown_v2(f"Task #{task_id} deleted"))
     else:
-        await message.answer("No encontré esa tarea")
+        await message.answer("Task not found")
 
 
 def build_dispatcher(bot: Bot, scheduler: BotScheduler) -> Dispatcher:
