@@ -14,6 +14,8 @@ class Task:
     run_at: Optional[datetime] = None
     paused: bool = False
     interval_minutes: Optional[int] = None  # For interval-based tasks (every Xh/Xm)
+    name: Optional[str] = None  # Optional task name
+    days_of_week: Optional[str] = None  # e.g., "mon,wed,fri" or None for daily
 
     @property
     def job_id(self) -> str:
@@ -22,3 +24,10 @@ class Task:
     @property
     def is_interval(self) -> bool:
         return self.interval_minutes is not None
+
+    @property
+    def display_name(self) -> str:
+        """Return name if set, otherwise Task #id."""
+        if self.name:
+            return self.name
+        return f"Task #{self.id}" if self.id else "Task"

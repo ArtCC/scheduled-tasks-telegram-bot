@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from typing import Any, Awaitable, Callable, List
 
@@ -16,7 +17,7 @@ from aiogram.types import (
 
 from .formatting import clamp_message, escape_html
 from .openai_client import generate_html
-from .scheduler import BotScheduler, parse_interval
+from .scheduler import BotScheduler, parse_days, parse_interval
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +65,7 @@ async def handle_start(message: Message) -> None:
         "Hi! I'm your scheduled tasks bot.\n\n"
         "<b>Commands:</b>\n"
         "/ask &lt;question&gt; - Ask something right now\n"
-        "/add HH:MM [TZ] &lt;request&gt; - Daily task\n"
+        "/add HH:MM [TZ] [days] [--name=X] &lt;request&gt; - Daily task\n"
         "/add YYYY-MM-DDTHH:MM &lt;request&gt; - One-time task\n"
         "/every &lt;interval&gt; &lt;request&gt; - Interval task\n"
         "/list - Show your scheduled tasks\n"
@@ -76,6 +77,8 @@ async def handle_start(message: Message) -> None:
         "/status - Bot status\n\n"
         "<b>Examples:</b>\n"
         "/add 08:00 Europe/Madrid Weather summary\n"
+        "/add 09:00 mon,wed,fri Weekly standup notes\n"
+        "/add 08:00 --name=News Daily headlines\n"
         "/every 2h Check server status"
     )
     await message.answer(text, parse_mode=ParseMode.HTML)
@@ -121,27 +124,78 @@ async def handle_ask(message: Message) -> None:
 
 @router.message(Command("add"))
 async def handle_add(message: Message) -> None:
+    """
+    Handle /add command with flexible syntax:
+    /add HH:MM [TZ] [days] [--name=X] <prompt>
+    /add YYYY-MM-DDTHH:MM [--name=X] <prompt>
+    """
     scheduler = _get_scheduler()
     settings = scheduler.settings
-    parts = (message.text or "").split(maxsplit=3)
+    text = (message.text or "").strip()
+
+    # Extract --name=X if present
+    name = None
+    name_match = re.search(r"--name=(\S+)", text)
+    if name_match:
+        name = name_match.group(1)
+        text = text.replace(name_match.group(0), "").strip()
+
+    parts = text.split()
     if len(parts) < 3:
-        await message.answer("Usage: /add HH:MM [Timezone] your request")
+        await message.answer(
+            "Usage: /add HH:MM [TZ] [days] [--name=X] &lt;prompt&gt;\n"
+            "Examples:\n"
+            "  /add 08:00 Weather summary\n"
+            "  /add 08:00 Europe/Madrid Weather summary\n"
+            "  /add 09:00 mon,wed,fri Standup notes\n"
+            "  /add 08:00 --name=News Daily headlines"
+        )
         return
 
-    time_spec = parts[1]
-    if len(parts) == 3:
-        tz_name = None
-        prompt = parts[2]
-    else:
-        tz_name = parts[2]
-        prompt = parts[3]
+    time_spec = parts[1]  # HH:MM or ISO datetime
+    tz_name = None
+    days_of_week = None
+
+    # Parse remaining arguments
+    idx = 2
+    prompt_parts = []
+
+    while idx < len(parts):
+        token = parts[idx]
+
+        # Check if it's a timezone (contains '/')
+        if "/" in token and tz_name is None and not days_of_week:
+            tz_name = token
+            idx += 1
+            continue
+
+        # Check if it's days specification (contains comma or is a valid day)
+        if days_of_week is None and re.match(r"^[a-z,]+$", token.lower()):
+            try:
+                days_of_week = parse_days(token)
+                idx += 1
+                continue
+            except ValueError:
+                pass  # Not valid days, treat as prompt
+
+        # Rest is the prompt
+        prompt_parts = parts[idx:]
+        break
+
+    prompt = " ".join(prompt_parts)
+
+    if not prompt:
+        await message.answer("Please provide a prompt for the task.")
+        return
 
     if len(prompt) > settings.max_prompt_chars:
         await message.answer(f"Prompt too long. Maximum {settings.max_prompt_chars} characters.")
         return
 
     try:
-        task = await scheduler.add_task(message.chat.id, time_spec, prompt, tz_name)
+        task = await scheduler.add_task(
+            message.chat.id, time_spec, prompt, tz_name, name, days_of_week
+        )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to add task: %s", exc)
         await message.answer(
@@ -150,15 +204,25 @@ async def handle_add(message: Message) -> None:
         )
         return
 
+    # Build confirmation message
+    task_name = task.display_name
     run_info = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d}"
-    if not task.run_at:
+
+    if task.run_at:
+        msg = f"✅ <b>{escape_html(task_name)}</b> scheduled for {run_info} ({task.timezone})."
+    elif task.days_of_week:
+        days_display = task.days_of_week.upper()
         msg = (
-            f"Task #{task.id} created. I'll run your request daily at {run_info} "
-            f"({task.timezone})"
+            f"✅ <b>{escape_html(task_name)}</b> created.\n"
+            f"Runs at {run_info} on {days_display} ({task.timezone})"
         )
     else:
-        msg = f"One-time task scheduled for {run_info} ({task.timezone})."
-    await message.answer(msg)
+        msg = (
+            f"✅ <b>{escape_html(task_name)}</b> created.\n"
+            f"Runs daily at {run_info} ({task.timezone})"
+        )
+
+    await message.answer(msg, parse_mode=ParseMode.HTML)
 
 
 @router.message(Command("every"))
@@ -302,19 +366,31 @@ async def handle_list(message: Message) -> None:
         return
 
     for task in tasks:
-        if task.interval_minutes:
-            when = _format_interval(task.interval_minutes)
-        elif task.run_at:
-            when = task.run_at.isoformat()
-        else:
-            when = f"{task.hour:02d}:{task.minute:02d} daily"
-        status = "⏸️ " if task.paused else ""
-        text = f"{status}<b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
+        text = _format_task_text(task)
         await message.answer(
             text,
             parse_mode=ParseMode.HTML,
             reply_markup=_build_task_keyboard(task),
         )
+
+
+def _format_task_text(task) -> str:
+    """Format task for display in /list and callbacks."""
+    if task.interval_minutes:
+        when = _format_interval(task.interval_minutes)
+    elif task.run_at:
+        when = task.run_at.isoformat()
+    elif task.days_of_week:
+        when = f"{task.hour:02d}:{task.minute:02d} ({task.days_of_week.upper()})"
+    else:
+        when = f"{task.hour:02d}:{task.minute:02d} daily"
+
+    status = "⏸️ " if task.paused else ""
+    task_name = task.display_name
+    return (
+        f"{status}<b>{escape_html(task_name)}</b> (#{task.id}): "
+        f"{when} ({task.timezone})\n{escape_html(task.prompt)}"
+    )
 
 
 @router.callback_query(F.data.startswith("pause:"))
@@ -334,8 +410,7 @@ async def callback_pause(callback: CallbackQuery) -> None:
 
     # Update the message with new keyboard
     task.paused = True
-    when = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
-    text = f"⏸️ <b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
+    text = _format_task_text(task)
     await callback.message.edit_text(
         text,
         parse_mode=ParseMode.HTML,
@@ -360,8 +435,7 @@ async def callback_resume(callback: CallbackQuery) -> None:
 
     # Update the message with new keyboard
     task.paused = False
-    when = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
-    text = f"<b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
+    text = _format_task_text(task)
     await callback.message.edit_text(
         text,
         parse_mode=ParseMode.HTML,

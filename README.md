@@ -12,10 +12,17 @@
 
 | Feature | Description |
 |---------|-------------|
-| � **Instant queries** | `/ask question` — get answers immediately |
+| 💬 **Instant queries** | `/ask question` — get answers immediately |
 | 🕐 **Daily schedules** | `/add 08:00 your request` — runs every day at that time |
+| 📆 **Specific days** | `/add 08:00 mon,wed,fri ...` — runs only on selected days |
+| ⏱️ **Interval tasks** | `/every 2h your request` — runs at fixed intervals |
 | 📅 **One-time tasks** | `/add 2026-12-31T23:00 message` — runs once at ISO datetime |
+| 🏷️ **Task names** | `/add 08:00 --name=News ...` — give tasks friendly names |
 | 🌍 **Timezone support** | `/add 08:00 Europe/Madrid ...` — per-task timezone |
+| ⏸️ **Pause/Resume** | Pause tasks without deleting them |
+| ▶️ **Run on demand** | `/run <id>` — execute any task immediately |
+| ✏️ **Edit tasks** | `/edit <id> <new prompt>` — modify existing tasks |
+| 🔘 **Inline buttons** | Manage tasks with interactive buttons |
 | 🔒 **Private by default** | Only authorized chat IDs can use the bot |
 | 💾 **Persistent storage** | SQLite database survives container restarts |
 | 🐳 **Docker ready** | Pre-built image on GHCR, Portainer-friendly |
@@ -64,25 +71,71 @@ Create a `docker-compose.yml` or use [the one in this repo](docker-compose.yml),
 
 ## 📱 Bot Commands
 
+### Task Creation
+
 | Command | Description |
 |---------|-------------|
-| `/start`, `/help` | Show help message |
 | `/ask <question>` | Ask a question and get an instant response |
-| `/add HH:MM [TZ] prompt` | Create a daily scheduled task |
-| `/add YYYY-MM-DDTHH:MM prompt` | Create a one-time task (ISO 8601) |
-| `/list` | List all your tasks with IDs |
-| `/delete <id>` | Delete a task by ID |
+| `/add HH:MM [TZ] [days] [--name=X] <prompt>` | Create a scheduled task |
+| `/add YYYY-MM-DDTHH:MM [--name=X] <prompt>` | Create a one-time task (ISO 8601) |
+| `/every <interval> <prompt>` | Create an interval task (e.g., `2h`, `30m`, `1h30m`) |
+
+### Task Management
+
+| Command | Description |
+|---------|-------------|
+| `/list` | List all tasks with interactive buttons |
+| `/run <id>` | Execute a task immediately |
+| `/edit <id> <new prompt>` | Edit an existing task's prompt |
+| `/pause <id>` | Pause a task (won't run until resumed) |
+| `/resume <id>` | Resume a paused task |
+| `/delete <id>` | Delete a task permanently |
+| `/status` | Show bot status and next scheduled run |
+| `/start`, `/help` | Show help message |
 
 ### Examples
 
 ```text
 /ask What's the latest news about AI?
-/add 08:00 Give me a daily weather summary for Madrid in 3 bullets.
-/add 09:15 Europe/London Summarize key crypto news in 5 bullets.
-/add 2026-01-15T07:30 Create a checklist for today's meeting.
+/add 08:00 Give me a daily weather summary for Madrid
+/add 09:15 Europe/London Summarize key crypto news
+/add 09:00 mon,wed,fri Weekly standup summary
+/add 08:00 --name=News Daily tech headlines
+/add 08:00 Europe/Madrid mon,fri --name=Report Weekly report
+/add 2026-01-15T07:30 Create a checklist for today's meeting
+/every 2h Check server status and report issues
+/every 30m Get latest Bitcoin price
+/run 1
+/edit 1 New prompt for the task
+/pause 2
+/status
 ```
 
+### Interval Formats
+
+| Format | Example | Description |
+|--------|---------|-------------|
+| `Xh` | `2h` | Every X hours |
+| `Xm` | `30m` | Every X minutes |
+| `XhYm` | `1h30m` | Every X hours and Y minutes |
+
+### Day Abbreviations
+
+| Days | |
+|------|-----|
+| `mon` | Monday |
+| `tue` | Tuesday |
+| `wed` | Wednesday |
+| `thu` | Thursday |
+| `fri` | Friday |
+| `sat` | Saturday |
+| `sun` | Sunday |
+
+Combine with commas: `mon,wed,fri`, `sat,sun`
+
 > ⚠️ Timezones must be valid IANA names: `UTC`, `Europe/Madrid`, `America/New_York`, etc.
+> 
+> 💡 Maximum interval is 24 hours. Minimum is 1 minute.
 
 ---
 
@@ -168,7 +221,7 @@ src/scheduled_bot/
 | Workflow | Trigger | Action |
 |----------|---------|--------|
 | [ci.yml](.github/workflows/ci.yml) | Push/PR | Lint (ruff), format (black), tests |
-| [publish.yml](.github/workflows/publish.yml) | Push to `main`/`master` or tags | Build & push to GHCR |
+| [publish.yml](.github/workflows/publish.yml) | Push to `main` or tags | Build & push to GHCR |
 
 Docker images:
 - `ghcr.io/artcc/scheduled-tasks-telegram-bot:latest` — latest from main

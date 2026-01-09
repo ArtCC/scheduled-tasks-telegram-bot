@@ -30,7 +30,9 @@ class TaskStorage:
                     timezone TEXT NOT NULL,
                     run_at TEXT,
                     paused INTEGER NOT NULL DEFAULT 0,
-                    interval_minutes INTEGER
+                    interval_minutes INTEGER,
+                    name TEXT,
+                    days_of_week TEXT
                 )
                 """
             )
@@ -41,6 +43,10 @@ class TaskStorage:
                 conn.execute("ALTER TABLE tasks ADD COLUMN paused INTEGER NOT NULL DEFAULT 0")
             if "interval_minutes" not in columns:
                 conn.execute("ALTER TABLE tasks ADD COLUMN interval_minutes INTEGER")
+            if "name" not in columns:
+                conn.execute("ALTER TABLE tasks ADD COLUMN name TEXT")
+            if "days_of_week" not in columns:
+                conn.execute("ALTER TABLE tasks ADD COLUMN days_of_week TEXT")
             conn.commit()
 
     def add_task(self, task: Task) -> Task:
@@ -48,8 +54,9 @@ class TaskStorage:
             cursor = conn.execute(
                 """
                 INSERT INTO tasks
-                    (chat_id, prompt, hour, minute, timezone, run_at, paused, interval_minutes)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    (chat_id, prompt, hour, minute, timezone, run_at,
+                     paused, interval_minutes, name, days_of_week)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.chat_id,
@@ -60,6 +67,8 @@ class TaskStorage:
                     task.run_at.isoformat() if task.run_at else None,
                     1 if task.paused else 0,
                     task.interval_minutes,
+                    task.name,
+                    task.days_of_week,
                 ),
             )
             conn.commit()
@@ -126,4 +135,6 @@ class TaskStorage:
             run_at=run_at,
             paused=bool(row["paused"]),
             interval_minutes=row["interval_minutes"],
+            name=row["name"],
+            days_of_week=row["days_of_week"],
         )

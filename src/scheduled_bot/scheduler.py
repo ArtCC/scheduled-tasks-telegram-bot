@@ -53,9 +53,15 @@ class BotScheduler:
         elif task.interval_minutes:
             trigger = IntervalTrigger(minutes=task.interval_minutes)
         else:
-            trigger = CronTrigger(
-                hour=task.hour, minute=task.minute, timezone=ZoneInfo(task.timezone)
-            )
+            # Build CronTrigger with optional days_of_week
+            cron_kwargs = {
+                "hour": task.hour,
+                "minute": task.minute,
+                "timezone": ZoneInfo(task.timezone),
+            }
+            if task.days_of_week:
+                cron_kwargs["day_of_week"] = task.days_of_week
+            trigger = CronTrigger(**cron_kwargs)
 
         self.scheduler.add_job(
             self._execute_task,
@@ -67,7 +73,13 @@ class BotScheduler:
         logger.info("Scheduled task %s for chat %s", job_id, task.chat_id)
 
     async def add_task(
-        self, chat_id: int, time_spec: str, prompt: str, timezone_name: str | None = None
+        self,
+        chat_id: int,
+        time_spec: str,
+        prompt: str,
+        timezone_name: str | None = None,
+        name: str | None = None,
+        days_of_week: str | None = None,
     ) -> Task:
         tz_name = timezone_name or self.settings.timezone
         task_time = parse_time_spec(time_spec, tz_name)
@@ -79,6 +91,8 @@ class BotScheduler:
             minute=task_time[1],
             timezone=task_time[3],
             run_at=task_time[2],
+            name=name,
+            days_of_week=days_of_week,
         )
         task = self.storage.add_task(task)
         self._schedule_task(task)
@@ -257,6 +271,25 @@ def parse_interval(interval_spec: str) -> int:
         raise ValueError("Interval cannot exceed 24 hours")
 
     return total_minutes
+
+
+# Valid day abbreviations for APScheduler
+VALID_DAYS = {"mon", "tue", "wed", "thu", "fri", "sat", "sun"}
+
+
+def parse_days(days_spec: str) -> str:
+    """
+    Parse and validate days specification like 'mon,wed,fri'.
+    Returns normalized string for APScheduler CronTrigger.
+    """
+    cleaned = days_spec.strip().lower()
+    days = [d.strip() for d in cleaned.split(",")]
+
+    for day in days:
+        if day not in VALID_DAYS:
+            raise ValueError(f"Invalid day '{day}'. Use: mon, tue, wed, thu, fri, sat, sun")
+
+    return ",".join(days)
 
 
 def _get_zoneinfo(tz_name: str) -> ZoneInfo:
