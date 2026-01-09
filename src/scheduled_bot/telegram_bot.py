@@ -37,7 +37,15 @@ class AuthMiddleware(BaseMiddleware):
         scheduler = _get_scheduler()
         if isinstance(event, Message) and event.chat:
             if event.chat.id not in scheduler.settings.allowed_chat_ids:
-                # Silently ignore unauthorized users
+                logger.warning(
+                    "Unauthorized access attempt from chat_id=%s", event.chat.id
+                )
+                await event.answer(
+                    "⛔ You are not authorized to use this bot.\n\n"
+                    f"Your chat ID is: <code>{event.chat.id}</code>\n\n"
+                    "If you are the owner, add this ID to ALLOWED_CHAT_IDS.",
+                    parse_mode=ParseMode.HTML,
+                )
                 return None
         return await handler(event, data)
 
