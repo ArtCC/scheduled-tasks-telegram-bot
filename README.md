@@ -1,5 +1,9 @@
 # 🤖 Scheduled Tasks Telegram Bot
 
+<a href="https://github.com/ArtCC/scheduled-tasks-telegram-bot/blob/main/assets/scheduled-tasks-telegram-bot.png">
+  <img src="https://raw.githubusercontent.com/ArtCC/scheduled-tasks-telegram-bot/main/assets/scheduled-tasks-telegram-bot.png" alt="Bot Icon" width="120" align="right">
+</a>
+
 [![CI](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/ci.yml)
 [![Docker](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml/badge.svg)](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
@@ -226,6 +230,18 @@ src/scheduled_bot/
 Docker images:
 - `ghcr.io/artcc/scheduled-tasks-telegram-bot:latest` — latest from main
 - `ghcr.io/artcc/scheduled-tasks-telegram-bot:v1.0.0` — tagged releases
+
+---
+
+## 🎨 Bot Icon
+
+If you want to set an icon for your bot in Telegram, you can download the high-resolution icon below. Just download it and send it to [@BotFather](https://t.me/BotFather) using the `/setuserpic` command.
+
+<p align="center">
+  <a href="https://github.com/ArtCC/scheduled-tasks-telegram-bot/blob/main/assets/scheduled-tasks-telegram-bot.png">
+    <img src="https://raw.githubusercontent.com/ArtCC/scheduled-tasks-telegram-bot/main/assets/scheduled-tasks-telegram-bot.png" alt="Bot Icon" width="200">
+  </a>
+</p>
 
 ---
 
