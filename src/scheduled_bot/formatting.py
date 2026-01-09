@@ -1,6 +1,5 @@
 import re
 
-
 # Characters requiring escape in Telegram MarkdownV2
 _MARKDOWN_V2_SPECIALS = re.compile(r"([_\*\[\]\(\)~`>#+\-=|{}.!])")
 
