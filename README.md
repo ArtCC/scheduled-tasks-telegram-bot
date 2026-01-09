@@ -137,5 +137,4 @@ Apache-2.0 (see [LICENSE](LICENSE)).
 
 ---
 
-<sub>Arturo Carretero Calvo - 2026</sub>
-<sub>100% built with GitHub Copilot (Claude Opus 4.5)</sub>
+<sub>100% built with GitHub Copilot (Claude Opus 4.5) - Arturo Carretero Calvo - 2026</sub>
