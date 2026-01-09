@@ -1,140 +1,183 @@
-# Scheduled Tasks Telegram Bot
+# 🤖 Scheduled Tasks Telegram Bot
 
-Telegram bot to schedule messages generated with the OpenAI API, always delivered in Telegram MarkdownV2. Includes APScheduler-based scheduling, SQLite persistence, and Docker deployment.
+[![CI](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/ci.yml/badge.svg)](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/ci.yml)
+[![Docker](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml/badge.svg)](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-## How it works
-- Sends responses directly to your Telegram chat in MarkdownV2.
-- Daily schedules with fixed time (`/add 08:00 whatever you want`).
-- One-off runs with ISO datetime (`/add 2025-12-31T23:00 one-time message`).
-- Basic commands: `/add`, `/list`, `/delete <id>`, `/start` (help).
-- Tasks are persisted in SQLite to survive restarts.
+> Telegram bot to schedule AI-generated messages using the OpenAI API. Responses are delivered in Telegram MarkdownV2 format with APScheduler-based scheduling and SQLite persistence.
 
-## Requirements
-- Python 3.11+
-- Telegram BotFather token (`BOT_TOKEN`).
-- OpenAI API key (`OPENAI_API_KEY`).
+---
 
-## Environment variables
-Create a `.env` from [.env.example](.env.example):
-- `BOT_TOKEN`: Telegram bot token (required).
-- `OPENAI_API_KEY`: OpenAI key (required).
-- `ALLOWED_CHAT_IDS`: comma-separated list of authorized Telegram chat IDs (required). Get yours from [@userinfobot](https://t.me/userinfobot).
-- `OPENAI_MODEL`: model to use (default `gpt-4.1-mini`).
-- `TIMEZONE`: scheduler timezone, e.g. `Europe/Madrid`.
-- `DATABASE_PATH`: SQLite path, default `./data/bot.db`.
-- `OPENAI_MAX_TOKENS`: max tokens per response (default 400).
-- `OPENAI_TEMPERATURE`: model temperature (default 0.4).
-- `MAX_PROMPT_CHARS`: max prompt length (default 1200).
-- `MAX_RESPONSE_CHARS`: max response length before sending to Telegram (default 3500).
-- `OPENAI_MAX_RETRIES`: retries with backoff for OpenAI calls (default 3).
+## ✨ Features
 
-## Local development
-1) Create venv and deps:
-```
-make install
-```
-2) Run the bot (long polling):
-```
-make run
-```
-3) Lint and tests:
-```
-make lint
-make test
-```
+| Feature | Description |
+|---------|-------------|
+| 🕐 **Daily schedules** | \`/add 08:00 your request\` — runs every day at that time |
+| 📅 **One-time tasks** | \`/add 2025-12-31T23:00 message\` — runs once at ISO datetime |
+| 🌍 **Timezone support** | \`/add 08:00 Europe/Madrid ...\` — per-task timezone |
+| 🔒 **Private by default** | Only authorized chat IDs can use the bot |
+| 💾 **Persistent storage** | SQLite database survives container restarts |
+| 🐳 **Docker ready** | Pre-built image on GHCR, Portainer-friendly |
 
-Entry point: [src/scheduled_bot/__main__.py](src/scheduled_bot/__main__.py).
+---
 
-## Bot usage (commands)
-- `/start` or `/help`: quick help.
-- `/add HH:MM [Timezone] message`: daily schedule. Example: `/add 08:00 Europe/Madrid ...`.
-- `/add YYYY-MM-DDTHH:MM message`: one-time run (ISO 8601, uses configured TZ or the one provided in the command).
-- `/list`: list tasks with IDs.
-- `/delete <id>`: delete a task you own.
+## �� Quick Start
 
-Notes:
-- Timezones must be valid IANA names (e.g., `UTC`, `Europe/Madrid`, `America/New_York`). Invalid values return a clear error.
+### 1. Get your credentials
 
-### Prompt examples
-- `/add 08:00 Give me a daily weather summary for Madrid in 3 bullets.`
-- `/add 09:15 Summarize key crypto news in 5 bullets.`
-- `/add 2025-01-10T07:30 Create a checklist for today’s meeting.`
+- **Telegram Bot Token**: Create a bot with [@BotFather](https://t.me/BotFather)
+- **OpenAI API Key**: Get one from [platform.openai.com](https://platform.openai.com/api-keys)
+- **Your Chat ID**: Send any message to [@userinfobot](https://t.me/userinfobot)
 
-### Length and format
-- The bot enforces Telegram MarkdownV2 and escapes special characters automatically.
-- Prompt and response lengths are capped; long responses are truncated with the suffix `…[truncated]`.
+### 2. Deploy with Docker
 
-## Docker deployment
+\`\`\`bash
+docker pull ghcr.io/artcc/scheduled-tasks-telegram-bot:latest
+\`\`\`
 
-The default [docker-compose.yml](docker-compose.yml) pulls from the public GHCR image `ghcr.io/artcc/scheduled-tasks-telegram-bot:latest`.
+Create a \`docker-compose.yml\` or use [the one in this repo](docker-compose.yml), then configure your environment variables in Portainer or a \`.env\` file.
 
-### Option A: Using environment variables (recommended for Portainer)
+---
 
-The compose file uses `${VAR:-default}` syntax, perfect for Portainer stacks:
+## ⚙️ Environment Variables
 
-1. In **Portainer → Stacks → Add stack**, paste the compose content or import from Git.
-2. Add environment variables in the **Environment variables** section:
-   - `BOT_TOKEN` (required): your Telegram bot token.
-   - `OPENAI_API_KEY` (required): your OpenAI API key.
-   - Others are optional (defaults already set).
-3. Deploy the stack.
+| Variable | Required | Default | Description |
+|----------|:--------:|---------|-------------|
+| \`BOT_TOKEN\` | ✅ | — | Telegram bot token from BotFather |
+| \`OPENAI_API_KEY\` | ✅ | — | OpenAI API key |
+| \`ALLOWED_CHAT_IDS\` | ✅ | — | Comma-separated list of authorized chat IDs |
+| \`OPENAI_MODEL\` | ❌ | \`gpt-4.1-mini\` | OpenAI model to use |
+| \`TIMEZONE\` | ❌ | \`UTC\` | Default timezone (IANA format) |
+| \`DATABASE_PATH\` | ❌ | \`/app/data/bot.db\` | SQLite database path |
+| \`OPENAI_MAX_TOKENS\` | ❌ | \`400\` | Max tokens per response |
+| \`OPENAI_TEMPERATURE\` | ❌ | \`0.4\` | Model temperature |
+| \`MAX_PROMPT_CHARS\` | ❌ | \`1200\` | Max prompt length |
+| \`MAX_RESPONSE_CHARS\` | ❌ | \`3500\` | Max response length |
+| \`OPENAI_MAX_RETRIES\` | ❌ | \`3\` | Retries with exponential backoff |
 
-### Option B: Using .env file locally
+> 💡 See [.env.example](.env.example) for a complete template.
 
-1. Copy `.env.example` to `.env` and fill values.
-2. Create a compose override to use env_file:
-```yaml
-# docker-compose.override.yml
+---
+
+## 📱 Bot Commands
+
+| Command | Description |
+|---------|-------------|
+| \`/start\`, \`/help\` | Show help message |
+| \`/add HH:MM [TZ] prompt\` | Create a daily scheduled task |
+| \`/add YYYY-MM-DDTHH:MM prompt\` | Create a one-time task (ISO 8601) |
+| \`/list\` | List all your tasks with IDs |
+| \`/delete <id>\` | Delete a task by ID |
+
+### Examples
+
+\`\`\`
+/add 08:00 Give me a daily weather summary for Madrid in 3 bullets.
+/add 09:15 Europe/London Summarize key crypto news in 5 bullets.
+/add 2025-01-10T07:30 Create a checklist for today's meeting.
+\`\`\`
+
+> ⚠️ Timezones must be valid IANA names: \`UTC\`, \`Europe/Madrid\`, \`America/New_York\`, etc.
+
+---
+
+## 🐳 Docker Deployment
+
+### Option A: Portainer (recommended)
+
+1. Go to **Stacks → Add stack**
+2. Paste the [docker-compose.yml](docker-compose.yml) content or import from Git
+3. Add environment variables:
+   - \`BOT_TOKEN\`
+   - \`OPENAI_API_KEY\`
+   - \`ALLOWED_CHAT_IDS\`
+4. Deploy
+
+### Option B: Docker Compose with \`.env\`
+
+\`\`\`bash
+# Copy and edit environment file
+cp .env.example .env
+
+# Create override file
+cat > docker-compose.override.yml << 'EOF'
 services:
   bot:
     env_file:
       - .env
-```
-3. Run:
-```bash
+EOF
+
+# Start the bot
 docker compose up -d
-```
+\`\`\`
 
-### Building locally (development)
+### Useful commands
 
-If you want to build from source instead of pulling from GHCR:
-```bash
-docker compose build
-docker compose up -d
-```
-
-### Logs
-```bash
+\`\`\`bash
+# View logs
 docker compose logs -f
-```
 
-### Pull latest image
-```bash
-docker compose pull
-docker compose up -d
-```
+# Update to latest image
+docker compose pull && docker compose up -d
 
-Base image: [Dockerfile](Dockerfile). Compose service: [docker-compose.yml](docker-compose.yml).
-
-## Project structure
-- [src/scheduled_bot/__main__.py](src/scheduled_bot/__main__.py): bot and scheduler bootstrap.
-- [src/scheduled_bot/telegram_bot.py](src/scheduled_bot/telegram_bot.py): commands and handlers.
-- [src/scheduled_bot/scheduler.py](src/scheduled_bot/scheduler.py): task scheduling and execution.
-- [src/scheduled_bot/openai_client.py](src/scheduled_bot/openai_client.py): OpenAI call with MarkdownV2 instructions.
-- [src/scheduled_bot/formatting.py](src/scheduled_bot/formatting.py): safe MarkdownV2 escaping.
-- [src/scheduled_bot/storage.py](src/scheduled_bot/storage.py): SQLite persistence for tasks.
-- [tests](tests): basic tests.
-
-## CI
-GitHub Actions workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) runs lint (ruff), format check (black), and tests on every push/PR.
-
-Workflow [.github/workflows/publish.yml](.github/workflows/publish.yml) builds and pushes the Docker image to GHCR automatically on:
-- Push to `main` or `master` branch → tagged as `latest`
-- Git tags (`v*`) → tagged with version number
-
-## License
-Apache-2.0 (see [LICENSE](LICENSE)).
+# Build locally (development)
+docker compose build && docker compose up -d
+\`\`\`
 
 ---
 
-<sub>100% built with GitHub Copilot (Claude Opus 4.5) - Arturo Carretero Calvo - 2026</sub>
+## 🛠️ Local Development
+
+\`\`\`bash
+# Install dependencies
+make install
+
+# Run the bot
+make run
+
+# Lint and test
+make lint
+make test
+\`\`\`
+
+---
+
+## 📁 Project Structure
+
+\`\`\`
+src/scheduled_bot/
+├── __main__.py      # Entry point, bot bootstrap
+├── telegram_bot.py  # Command handlers & auth middleware
+├── scheduler.py     # APScheduler task management
+├── openai_client.py # OpenAI API with retry logic
+├── formatting.py    # MarkdownV2 escaping
+├── storage.py       # SQLite persistence
+├── config.py        # Settings from environment
+└── models.py        # Data models
+\`\`\`
+
+---
+
+## 🔄 CI/CD
+
+| Workflow | Trigger | Action |
+|----------|---------|--------|
+| [ci.yml](.github/workflows/ci.yml) | Push/PR | Lint (ruff), format (black), tests |
+| [publish.yml](.github/workflows/publish.yml) | Push to \`main\`/\`master\` or tags | Build & push to GHCR |
+
+Docker images:
+- \`ghcr.io/artcc/scheduled-tasks-telegram-bot:latest\` — latest from main
+- \`ghcr.io/artcc/scheduled-tasks-telegram-bot:v1.0.0\` — tagged releases
+
+---
+
+## 📄 License
+
+[Apache-2.0](LICENSE)
+
+---
+
+<p align="center">
+  <sub>100% built with GitHub Copilot (Claude Opus 4.5)</sub><br>
+  <sub>Arturo Carretero Calvo — 2026</sub>
+</p>
