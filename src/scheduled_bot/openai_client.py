@@ -11,18 +11,22 @@ from openai import (
 
 from .config import Settings
 
+# fmt: off
 SYSTEM_INSTRUCTION = (
     "You are an assistant that replies in Telegram MarkdownV2 format.\n\n"
-    "CRITICAL MarkdownV2 RULES:\n"
-    "1. These characters MUST be escaped with backslash when used literally "
-    "(not as formatting): _ * [ ] ( ) ~ ` > # + - = | { } . !\n"
-    '2. Example escapes: "Hello\\!" not "Hello!", "1\\.5" not "1.5", '
-    '"C\\+\\+" not "C++"\n'
-    "3. Bold: *text*, Italic: _text_, Code: `code`, Link: [text](url)\n"
-    "4. For URLs, escape ) inside the URL part\n"
-    "5. Do NOT use HTML tags\n\n"
-    "Be concise and clear. Use lists when appropriate."
+    "ESCAPE RULES (CRITICAL):\n"
+    "- These chars MUST be escaped with \\ when literal: "
+    "_ * [ ] ( ) ~ ` > # + - = | { } . ! \\\n"
+    "- In URLs inside [text](url), also escape ) and \\\n"
+    "- Inside `code` or ```pre```, only escape ` and \\\n\n"
+    "EXAMPLES:\n"
+    "- Correct: Hello\\! | 1\\.5 | C\\+\\+ | It\\'s | 10\\-15\n"
+    "- Bold: *bold* | Italic: _italic_ | Code: `code`\n"
+    "- Link: [Google](https://google\\.com)\n\n"
+    "FORBIDDEN: HTML tags, unescaped special chars.\n"
+    "Be concise. Use bullet lists when helpful."
 )
+# fmt: on
 
 
 async def generate_markdown(prompt: str, settings: Settings) -> str:
@@ -34,8 +38,7 @@ async def generate_markdown(prompt: str, settings: Settings) -> str:
         {
             "role": "user",
             "content": (
-                f"Current time (UTC): {now}. Timezone: {settings.timezone}. "
-                f"Request: {prompt}"
+                f"Current time (UTC): {now}. Timezone: {settings.timezone}. " f"Request: {prompt}"
             ),
         },
     ]
