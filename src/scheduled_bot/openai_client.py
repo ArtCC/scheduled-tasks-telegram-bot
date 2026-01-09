@@ -120,4 +120,3 @@ async def generate_html(prompt: str, settings: Settings) -> str:
     if last_exc:
         raise last_exc
     raise RuntimeError("Could not generate response")
-
