@@ -4,6 +4,7 @@ import logging
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
+from aiogram.types import BotCommand
 
 from .config import get_settings
 from .scheduler import BotScheduler
@@ -15,6 +16,16 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
+# Commands shown in the Telegram menu
+BOT_COMMANDS = [
+    BotCommand(command="start", description="Show welcome message and help"),
+    BotCommand(command="help", description="Show available commands"),
+    BotCommand(command="ask", description="Ask something right now"),
+    BotCommand(command="add", description="Schedule a new task"),
+    BotCommand(command="list", description="List your scheduled tasks"),
+    BotCommand(command="delete", description="Delete a task by ID"),
+]
+
 
 async def main() -> None:
     settings = get_settings()
@@ -22,6 +33,10 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN_V2),
     )
+
+    # Set bot commands menu
+    await bot.set_my_commands(BOT_COMMANDS)
+
     storage = TaskStorage(settings.database_path)
     scheduler = BotScheduler(bot=bot, storage=storage, settings=settings)
     scheduler.start()

@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram import Bot
 from aiogram.enums import ParseMode
+from aiogram.exceptions import TelegramBadRequest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
@@ -86,15 +87,29 @@ class BotScheduler:
 
     async def _execute_task(self, task: Task) -> None:
         try:
+            # OpenAI is instructed to return MarkdownV2-formatted text,
+            # so we do NOT escape it here (escaping would break the formatting).
             content = await generate_markdown(task.prompt, self.settings)
             content = clamp_message(content, self.settings.response_max_chars)
-            escaped = escape_markdown_v2(content)
-            escaped = clamp_message(escaped, self.settings.response_max_chars)
-            await self.bot.send_message(
-                chat_id=task.chat_id,
-                text=escaped,
-                parse_mode=ParseMode.MARKDOWN_V2,
-            )
+
+            try:
+                await self.bot.send_message(
+                    chat_id=task.chat_id,
+                    text=content,
+                    parse_mode=ParseMode.MARKDOWN_V2,
+                )
+            except TelegramBadRequest as md_err:
+                # OpenAI may produce invalid MarkdownV2; fallback to plain text
+                logger.warning(
+                    "MarkdownV2 parse error for task %s: %s. Sending as plain text.",
+                    task.id,
+                    md_err,
+                )
+                await self.bot.send_message(
+                    chat_id=task.chat_id,
+                    text=content,
+                    parse_mode=None,
+                )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Failed to execute task %s: %s", task.id, exc)
             await self._notify_failure(task, exc)
@@ -103,7 +118,7 @@ class BotScheduler:
                 self.remove_task(task.id or 0, task.chat_id)
 
     async def _notify_failure(self, task: Task, exc: Exception) -> None:
-        msg = f"No se pudo generar la respuesta: {exc}"
+        msg = f"Failed to generate response: {exc}"
         await self.bot.send_message(
             chat_id=task.chat_id,
             text=escape_markdown_v2(msg),

@@ -1,10 +1,18 @@
 import re
 
 # Characters requiring escape in Telegram MarkdownV2
-_MARKDOWN_V2_SPECIALS = re.compile(r"([_\*\[\]\(\)~`>#+\-=|{}.!])")
+# According to Telegram docs: _ * [ ] ( ) ~ ` > # + - = | { } . !
+# Also backslash \ must be escaped first
+_MARKDOWN_V2_SPECIALS = re.compile(r"([_*\[\]()~`>#+\-=|{}.!\\])")
 
 
 def escape_markdown_v2(text: str) -> str:
+    """Escape all MarkdownV2 special characters.
+
+    According to Telegram Bot API docs, these characters must be escaped
+    with a preceding backslash: _ * [ ] ( ) ~ ` > # + - = | { } . !
+    The backslash itself must also be escaped.
+    """
     return _MARKDOWN_V2_SPECIALS.sub(r"\\\1", text)
 
 
