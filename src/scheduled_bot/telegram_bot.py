@@ -1,11 +1,17 @@
 import logging
 from typing import Any, Awaitable, Callable, List
 
-from aiogram import BaseMiddleware, Dispatcher, Router
+from aiogram import BaseMiddleware, Dispatcher, F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
-from aiogram.types import Message, TelegramObject
+from aiogram.types import (
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+    TelegramObject,
+)
 
 from .formatting import clamp_message, escape_html
 from .openai_client import generate_html
@@ -60,6 +66,7 @@ async def handle_start(message: Message) -> None:
         "/add HH:MM [TZ] &lt;request&gt; - Schedule daily task\n"
         "/add YYYY-MM-DDTHH:MM &lt;request&gt; - One-time task\n"
         "/list - Show your scheduled tasks\n"
+        "/edit &lt;id&gt; &lt;new prompt&gt; - Edit a task\n"
         "/pause &lt;id&gt; - Pause a task\n"
         "/resume &lt;id&gt; - Resume a paused task\n"
         "/delete &lt;id&gt; - Remove a task\n\n"
@@ -148,6 +155,24 @@ async def handle_add(message: Message) -> None:
     await message.answer(msg)
 
 
+def _build_task_keyboard(task) -> InlineKeyboardMarkup:
+    """Build inline keyboard for a task."""
+    task_id = task.id
+    if task.paused:
+        pause_btn = InlineKeyboardButton(text="▶️ Resume", callback_data=f"resume:{task_id}")
+    else:
+        pause_btn = InlineKeyboardButton(text="⏸️ Pause", callback_data=f"pause:{task_id}")
+
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                pause_btn,
+                InlineKeyboardButton(text="🗑️ Delete", callback_data=f"delete:{task_id}"),
+            ]
+        ]
+    )
+
+
 @router.message(Command("list"))
 async def handle_list(message: Message) -> None:
     scheduler = _get_scheduler()
@@ -156,16 +181,84 @@ async def handle_list(message: Message) -> None:
         await message.answer("You have no tasks.")
         return
 
-    lines = []
     for task in tasks:
         when = (
             task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
         )
         status = "⏸️ " if task.paused else ""
-        lines.append(
-            f"{status}#{task.id}: {when} ({task.timezone}) -&gt; {escape_html(task.prompt)}"
+        text = f"{status}<b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
+        await message.answer(
+            text,
+            parse_mode=ParseMode.HTML,
+            reply_markup=_build_task_keyboard(task),
         )
-    await message.answer("\n".join(lines))
+
+
+@router.callback_query(F.data.startswith("pause:"))
+async def callback_pause(callback: CallbackQuery) -> None:
+    """Handle pause button callback."""
+    scheduler = _get_scheduler()
+    task_id = int(callback.data.split(":")[1])
+    chat_id = callback.message.chat.id
+
+    task = scheduler.storage.get_task(task_id, chat_id)
+    if not task:
+        await callback.answer("Task not found", show_alert=True)
+        return
+
+    scheduler.pause_task(task_id, chat_id)
+    await callback.answer("⏸️ Task paused")
+
+    # Update the message with new keyboard
+    task.paused = True
+    when = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
+    text = f"⏸️ <b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
+    await callback.message.edit_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=_build_task_keyboard(task),
+    )
+
+
+@router.callback_query(F.data.startswith("resume:"))
+async def callback_resume(callback: CallbackQuery) -> None:
+    """Handle resume button callback."""
+    scheduler = _get_scheduler()
+    task_id = int(callback.data.split(":")[1])
+    chat_id = callback.message.chat.id
+
+    task = scheduler.storage.get_task(task_id, chat_id)
+    if not task:
+        await callback.answer("Task not found", show_alert=True)
+        return
+
+    scheduler.resume_task(task_id, chat_id)
+    await callback.answer("▶️ Task resumed")
+
+    # Update the message with new keyboard
+    task.paused = False
+    when = task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
+    text = f"<b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
+    await callback.message.edit_text(
+        text,
+        parse_mode=ParseMode.HTML,
+        reply_markup=_build_task_keyboard(task),
+    )
+
+
+@router.callback_query(F.data.startswith("delete:"))
+async def callback_delete(callback: CallbackQuery) -> None:
+    """Handle delete button callback."""
+    scheduler = _get_scheduler()
+    task_id = int(callback.data.split(":")[1])
+    chat_id = callback.message.chat.id
+
+    removed = scheduler.remove_task(task_id, chat_id)
+    if removed:
+        await callback.answer("🗑️ Task deleted")
+        await callback.message.delete()
+    else:
+        await callback.answer("Task not found", show_alert=True)
 
 
 @router.message(Command("delete"))
@@ -185,6 +278,39 @@ async def handle_delete(message: Message) -> None:
     removed = scheduler.remove_task(task_id, message.chat.id)
     if removed:
         await message.answer(f"Task #{task_id} deleted")
+    else:
+        await message.answer("Task not found")
+
+
+@router.message(Command("edit"))
+async def handle_edit(message: Message) -> None:
+    """Edit the prompt of an existing task."""
+    scheduler = _get_scheduler()
+    settings = scheduler.settings
+    parts = (message.text or "").split(maxsplit=2)
+
+    if len(parts) < 3:
+        await message.answer("Usage: /edit &lt;id&gt; &lt;new prompt&gt;")
+        return
+
+    try:
+        task_id = int(parts[1])
+    except ValueError:
+        await message.answer("The id must be numeric")
+        return
+
+    new_prompt = parts[2].strip()
+    if not new_prompt:
+        await message.answer("The new prompt cannot be empty")
+        return
+
+    if len(new_prompt) > settings.max_prompt_chars:
+        await message.answer(f"Prompt too long. Maximum {settings.max_prompt_chars} characters.")
+        return
+
+    updated = scheduler.storage.update_prompt(task_id, message.chat.id, new_prompt)
+    if updated:
+        await message.answer(f"✏️ Task #{task_id} updated")
     else:
         await message.answer("Task not found")
 

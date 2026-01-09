@@ -79,6 +79,16 @@ class TaskStorage:
             ).fetchone()
             return self._row_to_task(row) if row else None
 
+    def update_prompt(self, task_id: int, chat_id: int, new_prompt: str) -> bool:
+        """Update the prompt of a task. Returns True if task was found."""
+        with self._connect() as conn:
+            cursor = conn.execute(
+                "UPDATE tasks SET prompt = ? WHERE id = ? AND chat_id = ?",
+                (new_prompt, task_id, chat_id),
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
     def list_tasks(self, chat_id: int) -> List[Task]:
         with self._connect() as conn:
             rows = conn.execute(
