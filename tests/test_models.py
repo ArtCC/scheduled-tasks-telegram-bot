@@ -26,6 +26,7 @@ class TestTask:
         assert task.interval_minutes is None
         assert task.name is None
         assert task.days_of_week is None
+        assert task.is_reminder is False
 
     def test_task_job_id(self):
         """Test job_id property."""
@@ -114,3 +115,48 @@ class TestTask:
         assert task.interval_minutes == 60
         assert task.name == "FullTask"
         assert task.days_of_week == "sat,sun"
+
+    def test_task_is_reminder_default(self):
+        """Test is_reminder defaults to False."""
+        task = Task(id=1, chat_id=1, prompt="", hour=0, minute=0, timezone="UTC")
+        assert task.is_reminder is False
+
+    def test_task_is_reminder_true(self):
+        """Test task with is_reminder set to True."""
+        task = Task(
+            id=1,
+            chat_id=1,
+            prompt="Buy milk",
+            hour=10,
+            minute=0,
+            timezone="UTC",
+            is_reminder=True,
+        )
+        assert task.is_reminder is True
+
+    def test_reminder_display_name(self):
+        """Test display_name for reminders without custom name."""
+        task = Task(
+            id=3,
+            chat_id=1,
+            prompt="Call mom",
+            hour=18,
+            minute=0,
+            timezone="UTC",
+            is_reminder=True,
+        )
+        assert task.display_name == "Reminder #3"
+
+    def test_reminder_display_name_with_custom_name(self):
+        """Test display_name for reminders with custom name."""
+        task = Task(
+            id=3,
+            chat_id=1,
+            prompt="Call mom",
+            hour=18,
+            minute=0,
+            timezone="UTC",
+            is_reminder=True,
+            name="MomCall",
+        )
+        assert task.display_name == "MomCall"
