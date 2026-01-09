@@ -2,6 +2,7 @@ version: "3.9"
 services:
   bot:
     image: ghcr.io/artcc/scheduled-tasks-telegram-bot:latest
+    container_name: scheduled-tasks-telegram-bot
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
