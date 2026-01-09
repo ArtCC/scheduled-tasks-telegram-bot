@@ -4,7 +4,7 @@
 [![Docker](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml/badge.svg)](https://github.com/artcc/scheduled-tasks-telegram-bot/actions/workflows/publish.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-> Telegram bot to schedule AI-generated messages using the OpenAI Responses API with web search capabilities. Responses are delivered in Telegram HTML format with APScheduler-based scheduling and SQLite persistence.
+> Telegram bot to schedule AI-generated messages using the OpenAI Responses API with web search. Responses are delivered in Telegram HTML format with APScheduler-based scheduling and SQLite persistence.
 
 ---
 
@@ -12,15 +12,15 @@
 
 | Feature | Description |
 |---------|-------------|
-| 🔍 **Web search** | Real-time data via OpenAI's web search tool |
-| 💬 **Instant queries** | `/ask question` — get answers immediately |
+| � **Instant queries** | `/ask question` — get answers immediately |
 | 🕐 **Daily schedules** | `/add 08:00 your request` — runs every day at that time |
 | 📅 **One-time tasks** | `/add 2026-12-31T23:00 message` — runs once at ISO datetime |
 | 🌍 **Timezone support** | `/add 08:00 Europe/Madrid ...` — per-task timezone |
 | 🔒 **Private by default** | Only authorized chat IDs can use the bot |
 | 💾 **Persistent storage** | SQLite database survives container restarts |
 | 🐳 **Docker ready** | Pre-built image on GHCR, Portainer-friendly |
-| 🤖 **Flexible models** | Use any OpenAI model (gpt-4o, gpt-4.1-mini, gpt-5, etc.) |
+| 🔍 **Web search** | AI can search the internet for up-to-date information |
+| 🤖 **Flexible models** | Use any OpenAI model (gpt-5, gpt-4o, gpt-4.1-mini, etc.) |
 
 ---
 

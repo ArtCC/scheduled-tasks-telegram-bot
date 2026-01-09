@@ -1,3 +1,5 @@
+"""OpenAI Responses API client with web search capability."""
+
 import asyncio
 import logging
 from datetime import datetime, timezone
@@ -27,45 +29,40 @@ SYSTEM_INSTRUCTION = (
     "- Do NOT use Markdown syntax like *bold* or _italic_\n"
     "- Do NOT use unsupported tags (div, span, p, br, etc.)\n\n"
     "Be concise and clear. Use bullet points when helpful.\n"
-    "When providing real-time data from web search, include the source."
+    "When citing web sources, include the URL as a clickable link."
 )
 # fmt: on
 
 
-def _extract_response_text(response) -> str:
-    """Extract text from Responses API output.
-
-    According to OpenAI docs, the response structure is:
-    - response.output_text (SDK convenience property)
-    - response.output[].content[].text (where type == "output_text")
+def _extract_text_from_response(response) -> str:
     """
-    # Method 1: SDK convenience property (Python/JS SDKs)
-    output_text = getattr(response, "output_text", None)
-    if output_text:
-        return str(output_text)
+    Extract text from OpenAI Responses API response.
 
-    # Method 2: Parse output array structure
-    if hasattr(response, "output") and response.output:
-        for item in response.output:
-            item_type = getattr(item, "type", None)
-            if item_type == "message":
-                content_list = getattr(item, "content", None) or []
-                for content in content_list:
-                    content_type = getattr(content, "type", None)
-                    if content_type == "output_text":
-                        text = getattr(content, "text", "")
+    Response structure:
+    - response.output: array of items
+    - Each item can be:
+      - type="web_search_call" (search was performed)
+      - type="message" with content array
+    - message.content[]: array with type="output_text" and "text" field
+    """
+    texts = []
+
+    for item in response.output:
+        # Skip web_search_call items - they don't contain text
+        if getattr(item, "type", None) == "web_search_call":
+            continue
+
+        # Process message items
+        if getattr(item, "type", None) == "message":
+            content = getattr(item, "content", None)
+            if content:
+                for content_item in content:
+                    if getattr(content_item, "type", None) == "output_text":
+                        text = getattr(content_item, "text", None)
                         if text:
-                            return str(text)
+                            texts.append(text)
 
-    # Log details for debugging
-    status = getattr(response, "status", "unknown")
-    logger.warning(
-        "Could not extract text. Status: %s, Response type: %s, output_text value: %r",
-        status,
-        type(response).__name__,
-        output_text,
-    )
-    return ""
+    return "\n\n".join(texts) if texts else ""
 
 
 async def generate_html(prompt: str, settings: Settings) -> str:
@@ -73,45 +70,59 @@ async def generate_html(prompt: str, settings: Settings) -> str:
     client = AsyncOpenAI(api_key=settings.openai_api_key)
 
     now = datetime.now(timezone.utc).isoformat()
-    user_input = f"Current time (UTC): {now}. Timezone: {settings.timezone}. Request: {prompt}"
+    user_input = f"Current time (UTC): {now}. Timezone: {settings.timezone}.\n\n{prompt}"
 
     retryable = (RateLimitError, APIError, APIConnectionError, APITimeoutError)
     delay = 1.0
     last_exc: Exception | None = None
 
-    # Build request parameters
-    # See: https://platform.openai.com/docs/api-reference/responses/create
+    # Build request parameters for Responses API
     params: dict = {
         "model": settings.openai_model,
-        "instructions": SYSTEM_INSTRUCTION,
         "input": user_input,
-        "tools": [{"type": "web_search"}],
+        "instructions": SYSTEM_INSTRUCTION,
         "max_output_tokens": settings.openai_max_tokens,
+        "tools": [{"type": "web_search"}],
+        "tool_choice": "auto",
     }
 
-    # Temperature not supported on gpt-5 models
-    if not settings.openai_model.startswith("gpt-5"):
+    # Temperature not supported on reasoning models (o1, o3, gpt-5)
+    model_lower = settings.openai_model.lower()
+    is_reasoning_model = (
+        model_lower.startswith("gpt-5")
+        or model_lower.startswith("o1")
+        or model_lower.startswith("o3")
+        or model_lower.startswith("o4")
+    )
+
+    if not is_reasoning_model:
         params["temperature"] = settings.openai_temperature
 
     for attempt in range(1, settings.openai_max_retries + 1):
         try:
+            # Use Responses API (client.responses.create)
             response = await client.responses.create(**params)
 
-            # Log response status for debugging
-            status = getattr(response, "status", "unknown")
-            logger.debug("OpenAI response status: %s", status)
+            logger.debug(
+                "Response status: %s, model: %s, output items: %d",
+                response.status,
+                response.model,
+                len(response.output) if response.output else 0,
+            )
 
-            text = _extract_response_text(response)
+            # Extract text from response
+            text = _extract_text_from_response(response)
 
-            if not text:
-                logger.error(
-                    "Empty response from OpenAI. Status: %s, Model: %s",
-                    status,
-                    settings.openai_model,
-                )
-                return "Lo siento, no pude generar una respuesta. Por favor, inténtalo de nuevo."
+            if text:
+                return text
 
-            return text
+            # Log details if no text was extracted
+            logger.error(
+                "Empty text extracted. Status: %s, Output: %s",
+                response.status,
+                [{"type": getattr(item, "type", None)} for item in (response.output or [])],
+            )
+            return "Lo siento, no pude generar una respuesta. Por favor, inténtalo de nuevo."
 
         except retryable as exc:  # type: ignore[misc]
             last_exc = exc
