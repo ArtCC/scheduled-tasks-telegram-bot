@@ -1,8 +1,8 @@
-from typing import List
+from typing import Any, Awaitable, Callable, List
 
-from aiogram import Dispatcher, Router
+from aiogram import BaseMiddleware, Dispatcher, Router
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, TelegramObject
 
 from .formatting import escape_markdown_v2
 from .scheduler import BotScheduler
@@ -17,6 +17,23 @@ def _get_scheduler() -> BotScheduler:
     if not _scheduler:
         raise RuntimeError("Scheduler is not configured")
     return _scheduler
+
+
+class AuthMiddleware(BaseMiddleware):
+    """Middleware that blocks messages from unauthorized chat IDs."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        scheduler = _get_scheduler()
+        if isinstance(event, Message) and event.chat:
+            if event.chat.id not in scheduler.settings.allowed_chat_ids:
+                # Silently ignore unauthorized users
+                return None
+        return await handler(event, data)
 
 
 @router.message(Command("start", "help"))
@@ -115,5 +132,6 @@ def build_dispatcher(scheduler: BotScheduler) -> Dispatcher:
     global _scheduler
     _scheduler = scheduler
     dispatcher = Dispatcher()
+    router.message.middleware(AuthMiddleware())
     dispatcher.include_router(router)
     return dispatcher

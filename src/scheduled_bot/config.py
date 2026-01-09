@@ -2,7 +2,7 @@ import os
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 from dotenv import load_dotenv
 
@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 class Settings:
     bot_token: str
     openai_api_key: str
+    allowed_chat_ids: Set[int]
     openai_model: str = "gpt-4.1-mini"
     timezone: str = "UTC"
     database_path: str = "./data/bot.db"
@@ -34,9 +35,23 @@ def get_settings(env_file: Optional[str] = None) -> Settings:
 
     bot_token = os.getenv("BOT_TOKEN")
     openai_api_key = os.getenv("OPENAI_API_KEY")
+    allowed_chat_ids_raw = os.getenv("ALLOWED_CHAT_IDS", "").strip()
 
     if not bot_token or not openai_api_key:
         raise RuntimeError("BOT_TOKEN and OPENAI_API_KEY must be set")
+
+    if not allowed_chat_ids_raw:
+        raise RuntimeError("ALLOWED_CHAT_IDS must be set (comma-separated list of chat IDs)")
+
+    try:
+        allowed_chat_ids = {
+            int(cid.strip()) for cid in allowed_chat_ids_raw.split(",") if cid.strip()
+        }
+    except ValueError as exc:
+        raise RuntimeError("ALLOWED_CHAT_IDS must contain only numeric IDs") from exc
+
+    if not allowed_chat_ids:
+        raise RuntimeError("ALLOWED_CHAT_IDS must contain at least one chat ID")
 
     database_path = os.getenv("DATABASE_PATH", Settings.database_path)
     _ensure_data_dir(database_path)
@@ -44,6 +59,7 @@ def get_settings(env_file: Optional[str] = None) -> Settings:
     return Settings(
         bot_token=bot_token,
         openai_api_key=openai_api_key,
+        allowed_chat_ids=allowed_chat_ids,
         openai_model=os.getenv("OPENAI_MODEL", Settings.openai_model),
         timezone=os.getenv("TIMEZONE", Settings.timezone),
         database_path=database_path,

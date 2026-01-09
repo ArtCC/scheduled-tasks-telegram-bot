@@ -16,8 +16,9 @@ Telegram bot to schedule messages generated with the OpenAI API, always delivere
 
 ## Environment variables
 Create a `.env` from [.env.example](.env.example):
-- `BOT_TOKEN`: Telegram bot token.
-- `OPENAI_API_KEY`: OpenAI key.
+- `BOT_TOKEN`: Telegram bot token (required).
+- `OPENAI_API_KEY`: OpenAI key (required).
+- `ALLOWED_CHAT_IDS`: comma-separated list of authorized Telegram chat IDs (required). Get yours from [@userinfobot](https://t.me/userinfobot).
 - `OPENAI_MODEL`: model to use (default `gpt-4.1-mini`).
 - `TIMEZONE`: scheduler timezone, e.g. `Europe/Madrid`.
 - `DATABASE_PATH`: SQLite path, default `./data/bot.db`.

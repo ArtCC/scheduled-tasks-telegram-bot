@@ -5,6 +5,7 @@ services:
     environment:
       - BOT_TOKEN=${BOT_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ALLOWED_CHAT_IDS=${ALLOWED_CHAT_IDS}
       - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4.1-mini}
       - TIMEZONE=${TIMEZONE:-UTC}
       - DATABASE_PATH=${DATABASE_PATH:-/app/data/bot.db}
