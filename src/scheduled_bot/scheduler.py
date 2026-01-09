@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import datetime
 from typing import Tuple
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -9,6 +10,7 @@ from aiogram.exceptions import TelegramBadRequest
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from .config import Settings
 from .formatting import clamp_message, escape_html
@@ -48,6 +50,8 @@ class BotScheduler:
 
         if task.run_at:
             trigger = DateTrigger(run_date=task.run_at.astimezone(ZoneInfo(task.timezone)))
+        elif task.interval_minutes:
+            trigger = IntervalTrigger(minutes=task.interval_minutes)
         else:
             trigger = CronTrigger(
                 hour=task.hour, minute=task.minute, timezone=ZoneInfo(task.timezone)
@@ -79,6 +83,47 @@ class BotScheduler:
         task = self.storage.add_task(task)
         self._schedule_task(task)
         return task
+
+    async def add_interval_task(self, chat_id: int, interval_minutes: int, prompt: str) -> Task:
+        """Add a task that runs at a fixed interval."""
+        task = Task(
+            id=None,
+            chat_id=chat_id,
+            prompt=prompt,
+            hour=0,
+            minute=0,
+            timezone=self.settings.timezone,
+            interval_minutes=interval_minutes,
+        )
+        task = self.storage.add_task(task)
+        self._schedule_task(task)
+        return task
+
+    async def run_task_now(self, task_id: int, chat_id: int) -> bool:
+        """Execute a task immediately. Returns True if task was found."""
+        task = self.storage.get_task(task_id, chat_id)
+        if not task:
+            return False
+        await self._execute_task(task, manual=True)
+        return True
+
+    def get_status(self) -> dict:
+        """Get scheduler status information."""
+        jobs = self.scheduler.get_jobs()
+        active_jobs = []
+        for job in jobs:
+            next_run = job.next_run_time
+            active_jobs.append(
+                {
+                    "id": job.id,
+                    "next_run": next_run.isoformat() if next_run else "paused",
+                }
+            )
+        return {
+            "running": self.scheduler.running,
+            "job_count": len(jobs),
+            "jobs": active_jobs,
+        }
 
     def remove_task(self, task_id: int, chat_id: int) -> bool:
         removed = self.storage.delete_task(task_id, chat_id)
@@ -124,12 +169,13 @@ class BotScheduler:
                 logger.debug("Job %s was not found in scheduler", job_id)
         return updated
 
-    async def _execute_task(self, task: Task) -> None:
-        # Refresh task state to check if paused
-        current_task = self.storage.get_task(task.id or 0, task.chat_id)
-        if current_task and current_task.paused:
-            logger.info("Task %s is paused, skipping execution", task.id)
-            return
+    async def _execute_task(self, task: Task, manual: bool = False) -> None:
+        # Refresh task state to check if paused (skip check for manual runs)
+        if not manual:
+            current_task = self.storage.get_task(task.id or 0, task.chat_id)
+            if current_task and current_task.paused:
+                logger.info("Task %s is paused, skipping execution", task.id)
+                return
 
         try:
             # OpenAI is instructed to return HTML-formatted text,
@@ -155,7 +201,8 @@ class BotScheduler:
             logger.exception("Failed to execute task %s: %s", task.id, exc)
             await self._notify_failure(task, exc)
         finally:
-            if task.run_at:
+            # Only remove one-time tasks (not interval or manual runs)
+            if task.run_at and not manual:
                 self.remove_task(task.id or 0, task.chat_id)
 
     async def _notify_failure(self, task: Task, exc: Exception) -> None:
@@ -186,6 +233,30 @@ def parse_time_spec(time_spec: str, timezone_name: str) -> Tuple[int, int, datet
     if not 0 <= hour <= 23 or not 0 <= minute <= 59:
         raise ValueError("Hour or minute out of range")
     return hour, minute, None, timezone_name
+
+
+def parse_interval(interval_spec: str) -> int:
+    """
+    Parse interval specification like '2h', '30m', '1h30m'.
+    Returns total minutes.
+    """
+    cleaned = interval_spec.strip().lower()
+    pattern = r"^(?:(\d+)h)?(?:(\d+)m)?$"
+    match = re.match(pattern, cleaned)
+
+    if not match or (not match.group(1) and not match.group(2)):
+        raise ValueError("Invalid interval format. Use Xh, Xm, or XhYm (e.g., 2h, 30m, 1h30m)")
+
+    hours = int(match.group(1)) if match.group(1) else 0
+    minutes = int(match.group(2)) if match.group(2) else 0
+
+    total_minutes = hours * 60 + minutes
+    if total_minutes < 1:
+        raise ValueError("Interval must be at least 1 minute")
+    if total_minutes > 24 * 60:
+        raise ValueError("Interval cannot exceed 24 hours")
+
+    return total_minutes
 
 
 def _get_zoneinfo(tz_name: str) -> ZoneInfo:

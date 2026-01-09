@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from typing import Any, Awaitable, Callable, List
 
 from aiogram import BaseMiddleware, Dispatcher, F, Router
@@ -15,7 +16,7 @@ from aiogram.types import (
 
 from .formatting import clamp_message, escape_html
 from .openai_client import generate_html
-from .scheduler import BotScheduler
+from .scheduler import BotScheduler, parse_interval
 
 logger = logging.getLogger(__name__)
 
@@ -61,18 +62,23 @@ class AuthMiddleware(BaseMiddleware):
 async def handle_start(message: Message) -> None:
     text = (
         "Hi! I'm your scheduled tasks bot.\n\n"
-        "Commands:\n"
+        "<b>Commands:</b>\n"
         "/ask &lt;question&gt; - Ask something right now\n"
-        "/add HH:MM [TZ] &lt;request&gt; - Schedule daily task\n"
+        "/add HH:MM [TZ] &lt;request&gt; - Daily task\n"
         "/add YYYY-MM-DDTHH:MM &lt;request&gt; - One-time task\n"
+        "/every &lt;interval&gt; &lt;request&gt; - Interval task\n"
         "/list - Show your scheduled tasks\n"
+        "/run &lt;id&gt; - Run a task now\n"
         "/edit &lt;id&gt; &lt;new prompt&gt; - Edit a task\n"
         "/pause &lt;id&gt; - Pause a task\n"
         "/resume &lt;id&gt; - Resume a paused task\n"
-        "/delete &lt;id&gt; - Remove a task\n\n"
-        "Example: /add 08:00 Europe/Madrid Weather summary"
+        "/delete &lt;id&gt; - Remove a task\n"
+        "/status - Bot status\n\n"
+        "<b>Examples:</b>\n"
+        "/add 08:00 Europe/Madrid Weather summary\n"
+        "/every 2h Check server status"
     )
-    await message.answer(text)
+    await message.answer(text, parse_mode=ParseMode.HTML)
 
 
 @router.message(Command("ask"))
@@ -155,6 +161,108 @@ async def handle_add(message: Message) -> None:
     await message.answer(msg)
 
 
+@router.message(Command("every"))
+async def handle_every(message: Message) -> None:
+    """Schedule an interval-based task."""
+    scheduler = _get_scheduler()
+    settings = scheduler.settings
+    parts = (message.text or "").split(maxsplit=2)
+
+    if len(parts) < 3:
+        await message.answer(
+            "Usage: /every &lt;interval&gt; &lt;request&gt;\nExample: /every 2h Check status"
+        )
+        return
+
+    interval_spec = parts[1]
+    prompt = parts[2].strip()
+
+    if len(prompt) > settings.max_prompt_chars:
+        await message.answer(f"Prompt too long. Maximum {settings.max_prompt_chars} characters.")
+        return
+
+    try:
+        interval_minutes = parse_interval(interval_spec)
+    except ValueError as exc:
+        await message.answer(f"❌ {exc}")
+        return
+
+    try:
+        task = await scheduler.add_interval_task(message.chat.id, interval_minutes, prompt)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to add interval task: %s", exc)
+        await message.answer(
+            "❌ <b>Error</b>\n\n" "Could not create the task. Please try again.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    interval_str = _format_interval(interval_minutes)
+    await message.answer(f"⏱️ Task #{task.id} created. I'll run it {interval_str}.")
+
+
+@router.message(Command("run"))
+async def handle_run(message: Message) -> None:
+    """Run a task immediately."""
+    scheduler = _get_scheduler()
+    parts = (message.text or "").split(maxsplit=1)
+
+    if len(parts) < 2:
+        await message.answer("Usage: /run &lt;id&gt;")
+        return
+
+    try:
+        task_id = int(parts[1])
+    except ValueError:
+        await message.answer("The id must be numeric")
+        return
+
+    task = scheduler.storage.get_task(task_id, message.chat.id)
+    if not task:
+        await message.answer("Task not found")
+        return
+
+    await message.answer(f"🚀 Running task #{task_id}...")
+    await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    await scheduler.run_task_now(task_id, message.chat.id)
+
+
+@router.message(Command("status"))
+async def handle_status(message: Message) -> None:
+    """Show bot status."""
+    scheduler = _get_scheduler()
+    status = scheduler.get_status()
+    tasks = scheduler.storage.list_tasks(message.chat.id)
+
+    active = sum(1 for t in tasks if not t.paused)
+    paused = sum(1 for t in tasks if t.paused)
+
+    # Find next execution time for user's tasks
+    next_run = None
+    for job_info in status["jobs"]:
+        task_id_str = job_info["id"].replace("task-", "")
+        try:
+            task_id = int(task_id_str)
+            task = scheduler.storage.get_task(task_id, message.chat.id)
+            if task and not task.paused and job_info["next_run"] != "paused":
+                job_next = datetime.fromisoformat(job_info["next_run"])
+                if next_run is None or job_next < next_run:
+                    next_run = job_next
+        except (ValueError, TypeError):
+            continue
+
+    lines = [
+        "📊 <b>Bot Status</b>\n",
+        f"🟢 Scheduler: {'running' if status['running'] else '🔴 stopped'}",
+        f"📋 Your tasks: {len(tasks)} ({active} active, {paused} paused)",
+    ]
+
+    if next_run:
+        lines.append(f"⏰ Next run: {next_run.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    await message.answer("\n".join(lines), parse_mode=ParseMode.HTML)
+
+
 def _build_task_keyboard(task) -> InlineKeyboardMarkup:
     """Build inline keyboard for a task."""
     task_id = task.id
@@ -166,11 +274,23 @@ def _build_task_keyboard(task) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
+                InlineKeyboardButton(text="▶️ Run", callback_data=f"run:{task_id}"),
                 pause_btn,
                 InlineKeyboardButton(text="🗑️ Delete", callback_data=f"delete:{task_id}"),
             ]
         ]
     )
+
+
+def _format_interval(minutes: int) -> str:
+    """Format interval minutes as human-readable string."""
+    if minutes >= 60:
+        hours = minutes // 60
+        mins = minutes % 60
+        if mins:
+            return f"every {hours}h{mins}m"
+        return f"every {hours}h"
+    return f"every {minutes}m"
 
 
 @router.message(Command("list"))
@@ -182,9 +302,12 @@ async def handle_list(message: Message) -> None:
         return
 
     for task in tasks:
-        when = (
-            task.run_at.isoformat() if task.run_at else f"{task.hour:02d}:{task.minute:02d} daily"
-        )
+        if task.interval_minutes:
+            when = _format_interval(task.interval_minutes)
+        elif task.run_at:
+            when = task.run_at.isoformat()
+        else:
+            when = f"{task.hour:02d}:{task.minute:02d} daily"
         status = "⏸️ " if task.paused else ""
         text = f"{status}<b>#{task.id}</b>: {when} ({task.timezone})\n{escape_html(task.prompt)}"
         await message.answer(
@@ -259,6 +382,23 @@ async def callback_delete(callback: CallbackQuery) -> None:
         await callback.message.delete()
     else:
         await callback.answer("Task not found", show_alert=True)
+
+
+@router.callback_query(F.data.startswith("run:"))
+async def callback_run(callback: CallbackQuery) -> None:
+    """Handle run button callback."""
+    scheduler = _get_scheduler()
+    task_id = int(callback.data.split(":")[1])
+    chat_id = callback.message.chat.id
+
+    task = scheduler.storage.get_task(task_id, chat_id)
+    if not task:
+        await callback.answer("Task not found", show_alert=True)
+        return
+
+    await callback.answer(f"🚀 Running task #{task_id}...")
+    await callback.message.chat.do(action="typing")
+    await scheduler.run_task_now(task_id, chat_id)
 
 
 @router.message(Command("delete"))

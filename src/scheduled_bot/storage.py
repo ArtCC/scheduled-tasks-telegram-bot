@@ -29,23 +29,27 @@ class TaskStorage:
                     minute INTEGER NOT NULL,
                     timezone TEXT NOT NULL,
                     run_at TEXT,
-                    paused INTEGER NOT NULL DEFAULT 0
+                    paused INTEGER NOT NULL DEFAULT 0,
+                    interval_minutes INTEGER
                 )
                 """
             )
-            # Migration: add paused column if it doesn't exist
+            # Migration: add columns if they don't exist
             cursor = conn.execute("PRAGMA table_info(tasks)")
             columns = [row[1] for row in cursor.fetchall()]
             if "paused" not in columns:
                 conn.execute("ALTER TABLE tasks ADD COLUMN paused INTEGER NOT NULL DEFAULT 0")
+            if "interval_minutes" not in columns:
+                conn.execute("ALTER TABLE tasks ADD COLUMN interval_minutes INTEGER")
             conn.commit()
 
     def add_task(self, task: Task) -> Task:
         with self._connect() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO tasks (chat_id, prompt, hour, minute, timezone, run_at, paused)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO tasks
+                    (chat_id, prompt, hour, minute, timezone, run_at, paused, interval_minutes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.chat_id,
@@ -55,6 +59,7 @@ class TaskStorage:
                     task.timezone,
                     task.run_at.isoformat() if task.run_at else None,
                     1 if task.paused else 0,
+                    task.interval_minutes,
                 ),
             )
             conn.commit()
@@ -120,4 +125,5 @@ class TaskStorage:
             timezone=row["timezone"],
             run_at=run_at,
             paused=bool(row["paused"]),
+            interval_minutes=row["interval_minutes"],
         )
