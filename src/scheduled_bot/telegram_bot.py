@@ -26,14 +26,10 @@ logger = logging.getLogger(__name__)
 router = Router()
 
 _ERR_INVALID_ID = (
-    "❌ <b>Invalid ID</b>\n\n"
-    "The task ID must be a number.\n"
-    "💡 Use /list to see your tasks."
+    "❌ <b>Invalid ID</b>\n\n" "The task ID must be a number.\n" "💡 Use /list to see your tasks."
 )
 _ERR_NOT_FOUND = (
-    "❌ <b>Task not found</b>\n\n"
-    "No task found with that ID.\n"
-    "💡 Use /list to see your tasks."
+    "❌ <b>Task not found</b>\n\n" "No task found with that ID.\n" "💡 Use /list to see your tasks."
 )
 
 # Global reference set by build_dispatcher
