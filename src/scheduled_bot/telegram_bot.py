@@ -11,7 +11,9 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
     Message,
+    ReplyKeyboardMarkup,
     TelegramObject,
 )
 
@@ -31,6 +33,18 @@ def _get_scheduler() -> BotScheduler:
     if not _scheduler:
         raise RuntimeError("Scheduler is not configured")
     return _scheduler
+
+
+def _main_keyboard() -> ReplyKeyboardMarkup:
+    """Build the persistent main keyboard."""
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📋 My Tasks"), KeyboardButton(text="➕ New Task")],
+            [KeyboardButton(text="📊 Status"), KeyboardButton(text="❓ Help")],
+        ],
+        resize_keyboard=True,
+        is_persistent=True,
+    )
 
 
 class AuthMiddleware(BaseMiddleware):
@@ -88,7 +102,34 @@ async def handle_start(message: Message) -> None:
         "<code>/remember 09:00 Take medication</code>\n"
         "<code>/remember 2026-03-15T10:00 Doctor appointment</code>"
     )
-    await message.answer(text, parse_mode=ParseMode.HTML)
+    await message.answer(text, parse_mode=ParseMode.HTML, reply_markup=_main_keyboard())
+
+
+@router.message(F.text == "📋 My Tasks")
+async def handle_kb_list(message: Message) -> None:
+    await handle_list(message)
+
+
+@router.message(F.text == "➕ New Task")
+async def handle_kb_new_task(message: Message) -> None:
+    await message.answer(
+        "ℹ️ <b>Create a new task</b>\n\n"
+        "Choose a command:\n\n"
+        "📅 /add HH:MM &lt;prompt&gt; — AI task\n"
+        "⏱️ /every &lt;interval&gt; &lt;prompt&gt; — Interval task\n"
+        "🔔 /remember HH:MM &lt;text&gt; — Plain reminder",
+        parse_mode=ParseMode.HTML,
+    )
+
+
+@router.message(F.text == "📊 Status")
+async def handle_kb_status(message: Message) -> None:
+    await handle_status(message)
+
+
+@router.message(F.text == "❓ Help")
+async def handle_kb_help(message: Message) -> None:
+    await handle_start(message)
 
 
 @router.message(Command("ask"))
@@ -229,7 +270,7 @@ async def handle_add(message: Message) -> None:
             f"Runs daily at {run_info} ({task.timezone})"
         )
 
-    await message.answer(msg, parse_mode=ParseMode.HTML)
+    await message.answer(msg, parse_mode=ParseMode.HTML, reply_markup=_main_keyboard())
 
 
 @router.message(Command("remember"))
@@ -330,7 +371,7 @@ async def handle_remember(message: Message) -> None:
             f"Will remind you daily at {run_info} ({task.timezone})"
         )
 
-    await message.answer(msg, parse_mode=ParseMode.HTML)
+    await message.answer(msg, parse_mode=ParseMode.HTML, reply_markup=_main_keyboard())
 
 
 @router.message(Command("every"))
@@ -370,7 +411,10 @@ async def handle_every(message: Message) -> None:
         return
 
     interval_str = _format_interval(interval_minutes)
-    await message.answer(f"⏱️ Task #{task.id} created. I'll run it {interval_str}.")
+    await message.answer(
+        f"⏱️ Task #{task.id} created. I'll run it {interval_str}.",
+        reply_markup=_main_keyboard(),
+    )
 
 
 @router.message(Command("run"))
@@ -380,18 +424,24 @@ async def handle_run(message: Message) -> None:
     parts = (message.text or "").split(maxsplit=1)
 
     if len(parts) < 2:
-        await message.answer("Usage: /run &lt;id&gt;")
+        await message.answer("ℹ️ Usage: /run &lt;id&gt;\n\nExample: /run 3")
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("The id must be numeric")
+        await message.answer(
+            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     task = scheduler.storage.get_task(task_id, message.chat.id)
     if not task:
-        await message.answer("Task not found")
+        await message.answer(
+            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     await message.answer(f"🚀 Running task #{task_id}...")
@@ -542,7 +592,7 @@ async def callback_pause(callback: CallbackQuery) -> None:
 
     task = scheduler.storage.get_task(task_id, chat_id)
     if not task:
-        await callback.answer("Task not found", show_alert=True)
+        await callback.answer("❌ Task not found", show_alert=True)
         return
 
     scheduler.pause_task(task_id, chat_id)
@@ -567,7 +617,7 @@ async def callback_resume(callback: CallbackQuery) -> None:
 
     task = scheduler.storage.get_task(task_id, chat_id)
     if not task:
-        await callback.answer("Task not found", show_alert=True)
+        await callback.answer("❌ Task not found", show_alert=True)
         return
 
     scheduler.resume_task(task_id, chat_id)
@@ -592,7 +642,7 @@ async def callback_delete(callback: CallbackQuery) -> None:
 
     task = scheduler.storage.get_task(task_id, chat_id)
     if not task:
-        await callback.answer("Task not found", show_alert=True)
+        await callback.answer("❌ Task not found", show_alert=True)
         return
 
     # Show confirmation keyboard
@@ -625,8 +675,13 @@ async def callback_confirm_delete(callback: CallbackQuery) -> None:
     if removed:
         await callback.answer("🗑️ Task deleted")
         await callback.message.delete()
+        await callback.message.answer(
+            "✅ <b>Task deleted.</b>\n\n💡 Use /list to see remaining tasks.",
+            parse_mode=ParseMode.HTML,
+            reply_markup=_main_keyboard(),
+        )
     else:
-        await callback.answer("Task not found", show_alert=True)
+        await callback.answer("❌ Task not found", show_alert=True)
 
 
 @router.callback_query(F.data.startswith("cancel_delete:"))
@@ -638,7 +693,7 @@ async def callback_cancel_delete(callback: CallbackQuery) -> None:
 
     task = scheduler.storage.get_task(task_id, chat_id)
     if not task:
-        await callback.answer("Task not found", show_alert=True)
+        await callback.answer("❌ Task not found", show_alert=True)
         return
 
     await callback.answer("Cancelled")
@@ -659,7 +714,7 @@ async def callback_run(callback: CallbackQuery) -> None:
 
     task = scheduler.storage.get_task(task_id, chat_id)
     if not task:
-        await callback.answer("Task not found", show_alert=True)
+        await callback.answer("❌ Task not found", show_alert=True)
         return
 
     await callback.answer(f"🚀 Running task #{task_id}...")
@@ -672,20 +727,41 @@ async def handle_delete(message: Message) -> None:
     scheduler = _get_scheduler()
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
-        await message.answer("Usage: /delete &lt;id&gt;")
+        await message.answer("ℹ️ Usage: /delete &lt;id&gt;\n\nExample: /delete 5")
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("The id must be numeric")
+        await message.answer(
+            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
-    removed = scheduler.remove_task(task_id, message.chat.id)
-    if removed:
-        await message.answer(f"Task #{task_id} deleted")
-    else:
-        await message.answer("Task not found")
+    task = scheduler.storage.get_task(task_id, message.chat.id)
+    if not task:
+        await message.answer(
+            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
+        return
+
+    confirm_keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="✅ Yes, delete", callback_data=f"confirm_delete:{task_id}"
+                ),
+                InlineKeyboardButton(text="❌ Cancel", callback_data=f"cancel_delete:{task_id}"),
+            ]
+        ]
+    )
+    await message.answer(
+        f"⚠️ <b>Delete {escape_html(task.display_name)}?</b>\n\nThis action cannot be undone.",
+        parse_mode=ParseMode.HTML,
+        reply_markup=confirm_keyboard,
+    )
 
 
 @router.message(Command("edit"))
@@ -696,18 +772,23 @@ async def handle_edit(message: Message) -> None:
     parts = (message.text or "").split(maxsplit=2)
 
     if len(parts) < 3:
-        await message.answer("Usage: /edit &lt;id&gt; &lt;new prompt&gt;")
+        await message.answer(
+            "ℹ️ Usage: /edit &lt;id&gt; &lt;new prompt&gt;\n\nExample: /edit 3 Daily weather summary"
+        )
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("The id must be numeric")
+        await message.answer(
+            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     new_prompt = parts[2].strip()
     if not new_prompt:
-        await message.answer("The new prompt cannot be empty")
+        await message.answer("❌ The new prompt cannot be empty.")
         return
 
     if len(new_prompt) > settings.max_prompt_chars:
@@ -716,9 +797,12 @@ async def handle_edit(message: Message) -> None:
 
     updated = scheduler.storage.update_prompt(task_id, message.chat.id, new_prompt)
     if updated:
-        await message.answer(f"✏️ Task #{task_id} updated")
+        await message.answer(f"✏️ Task #{task_id} updated.")
     else:
-        await message.answer("Task not found")
+        await message.answer(
+            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 @router.message(Command("clone"))
@@ -728,18 +812,24 @@ async def handle_clone(message: Message) -> None:
     parts = (message.text or "").split(maxsplit=1)
 
     if len(parts) < 2:
-        await message.answer("Usage: /clone &lt;id&gt;")
+        await message.answer("ℹ️ Usage: /clone &lt;id&gt;\n\nExample: /clone 3")
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("The id must be numeric")
+        await message.answer(
+            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     original = scheduler.storage.get_task(task_id, message.chat.id)
     if not original:
-        await message.answer("Task not found")
+        await message.answer(
+            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     # Create a copy of the task
@@ -777,20 +867,26 @@ async def handle_pause(message: Message) -> None:
     scheduler = _get_scheduler()
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
-        await message.answer("Usage: /pause &lt;id&gt;")
+        await message.answer("ℹ️ Usage: /pause &lt;id&gt;\n\nExample: /pause 3")
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("The id must be numeric")
+        await message.answer(
+            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     paused = scheduler.pause_task(task_id, message.chat.id)
     if paused:
-        await message.answer(f"⏸️ Task #{task_id} paused")
+        await message.answer(f"⏸️ Task #{task_id} paused.")
     else:
-        await message.answer("Task not found")
+        await message.answer(
+            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 @router.message(Command("resume"))
@@ -799,20 +895,26 @@ async def handle_resume(message: Message) -> None:
     scheduler = _get_scheduler()
     parts = (message.text or "").split(maxsplit=1)
     if len(parts) < 2:
-        await message.answer("Usage: /resume &lt;id&gt;")
+        await message.answer("ℹ️ Usage: /resume &lt;id&gt;\n\nExample: /resume 3")
         return
 
     try:
         task_id = int(parts[1])
     except ValueError:
-        await message.answer("The id must be numeric")
+        await message.answer(
+            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
         return
 
     resumed = scheduler.resume_task(task_id, message.chat.id)
     if resumed:
-        await message.answer(f"▶️ Task #{task_id} resumed")
+        await message.answer(f"▶️ Task #{task_id} resumed.")
     else:
-        await message.answer("Task not found")
+        await message.answer(
+            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            parse_mode=ParseMode.HTML,
+        )
 
 
 def build_dispatcher(scheduler: BotScheduler) -> Dispatcher:
