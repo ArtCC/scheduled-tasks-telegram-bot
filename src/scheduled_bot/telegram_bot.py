@@ -25,6 +25,17 @@ logger = logging.getLogger(__name__)
 
 router = Router()
 
+_ERR_INVALID_ID = (
+    "❌ <b>Invalid ID</b>\n\n"
+    "The task ID must be a number.\n"
+    "💡 Use /list to see your tasks."
+)
+_ERR_NOT_FOUND = (
+    "❌ <b>Task not found</b>\n\n"
+    "No task found with that ID.\n"
+    "💡 Use /list to see your tasks."
+)
+
 # Global reference set by build_dispatcher
 _scheduler: BotScheduler | None = None
 
@@ -431,7 +442,7 @@ async def handle_run(message: Message) -> None:
         task_id = int(parts[1])
     except ValueError:
         await message.answer(
-            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            _ERR_INVALID_ID,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -439,7 +450,7 @@ async def handle_run(message: Message) -> None:
     task = scheduler.storage.get_task(task_id, message.chat.id)
     if not task:
         await message.answer(
-            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            _ERR_NOT_FOUND,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -734,7 +745,7 @@ async def handle_delete(message: Message) -> None:
         task_id = int(parts[1])
     except ValueError:
         await message.answer(
-            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            _ERR_INVALID_ID,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -742,7 +753,7 @@ async def handle_delete(message: Message) -> None:
     task = scheduler.storage.get_task(task_id, message.chat.id)
     if not task:
         await message.answer(
-            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            _ERR_NOT_FOUND,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -781,7 +792,7 @@ async def handle_edit(message: Message) -> None:
         task_id = int(parts[1])
     except ValueError:
         await message.answer(
-            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            _ERR_INVALID_ID,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -800,7 +811,7 @@ async def handle_edit(message: Message) -> None:
         await message.answer(f"✏️ Task #{task_id} updated.")
     else:
         await message.answer(
-            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            _ERR_NOT_FOUND,
             parse_mode=ParseMode.HTML,
         )
 
@@ -819,7 +830,7 @@ async def handle_clone(message: Message) -> None:
         task_id = int(parts[1])
     except ValueError:
         await message.answer(
-            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            _ERR_INVALID_ID,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -827,7 +838,7 @@ async def handle_clone(message: Message) -> None:
     original = scheduler.storage.get_task(task_id, message.chat.id)
     if not original:
         await message.answer(
-            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            _ERR_NOT_FOUND,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -874,7 +885,7 @@ async def handle_pause(message: Message) -> None:
         task_id = int(parts[1])
     except ValueError:
         await message.answer(
-            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            _ERR_INVALID_ID,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -884,7 +895,7 @@ async def handle_pause(message: Message) -> None:
         await message.answer(f"⏸️ Task #{task_id} paused.")
     else:
         await message.answer(
-            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            _ERR_NOT_FOUND,
             parse_mode=ParseMode.HTML,
         )
 
@@ -902,7 +913,7 @@ async def handle_resume(message: Message) -> None:
         task_id = int(parts[1])
     except ValueError:
         await message.answer(
-            "❌ <b>Invalid ID</b>\n\nThe task ID must be a number.\n💡 Use /list to see your tasks.",
+            _ERR_INVALID_ID,
             parse_mode=ParseMode.HTML,
         )
         return
@@ -912,7 +923,7 @@ async def handle_resume(message: Message) -> None:
         await message.answer(f"▶️ Task #{task_id} resumed.")
     else:
         await message.answer(
-            "❌ <b>Task not found</b>\n\nNo task found with that ID.\n💡 Use /list to see your tasks.",
+            _ERR_NOT_FOUND,
             parse_mode=ParseMode.HTML,
         )
 
