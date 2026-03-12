@@ -83,10 +83,10 @@ class AuthMiddleware(BaseMiddleware):
 @router.message(Command("start", "help"))
 async def handle_start(message: Message) -> None:
     text = (
-        "🤖 <b>Scheduled Tasks Bot</b>\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n\n"
+        "🤖 <b>Scheduled Tasks Bot</b>\n\n"
         "💬 <b>Instant Queries</b>\n"
-        "├ /ask &lt;question&gt; — Get an answer now\n\n"
+        "├ /ask &lt;question&gt; — Get an answer now\n"
+        "├ &lt;free text&gt; — Any text (no /) queries the LLM\n\n"
         "📅 <b>Create Tasks</b>\n"
         "├ /add HH:MM [TZ] [days] [--name=X] &lt;prompt&gt;\n"
         "├ /add YYYY-MM-DDTHH:MM &lt;prompt&gt;\n"
@@ -101,7 +101,6 @@ async def handle_start(message: Message) -> None:
         "└ /delete &lt;id&gt;\n\n"
         "📊 <b>Info</b>\n"
         "└ /status — Bot status &amp; next runs\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━\n"
         "📝 <b>Examples</b>\n\n"
         "<code>/add 08:00 Daily weather summary</code>\n"
         "<code>/add 09:00 mon,wed,fri --name=Standup Team notes</code>\n"
@@ -171,6 +170,41 @@ async def handle_ask(message: Message) -> None:
             await message.answer(content, parse_mode=None)
     except Exception as exc:  # noqa: BLE001
         logger.exception("Failed to process /ask: %s", exc)
+        await message.answer(
+            "❌ <b>Error</b>\n\n" "Could not process your request. Please try again later.",
+            parse_mode=ParseMode.HTML,
+        )
+
+
+@router.message(F.text & ~F.text.startswith("/"))
+async def handle_text_query(message: Message) -> None:
+    """Handle free text queries as instant LLM questions."""
+    scheduler = _get_scheduler()
+    settings = scheduler.settings
+    prompt = (message.text or "").strip()
+
+    if not prompt:
+        return
+
+    if len(prompt) > settings.max_prompt_chars:
+        await message.answer(f"Question too long. Maximum {settings.max_prompt_chars} characters.")
+        return
+
+    # Send typing indicator
+    await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+    try:
+        content = await generate_html(prompt, settings)
+        content = clamp_message(content, settings.response_max_chars)
+
+        try:
+            await message.answer(content, parse_mode=ParseMode.HTML)
+        except TelegramBadRequest as e:
+            # Fallback to plain text if HTML parsing fails
+            logger.debug("HTML fallback for text query: %s", e)
+            await message.answer(content, parse_mode=None)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Failed to process text query: %s", exc)
         await message.answer(
             "❌ <b>Error</b>\n\n" "Could not process your request. Please try again later.",
             parse_mode=ParseMode.HTML,
@@ -484,7 +518,6 @@ async def handle_status(message: Message) -> None:
 
     lines = [
         "📊 <b>Bot Status</b>",
-        "━━━━━━━━━━━━━━━━━━",
         "",
         f"⚙️ Scheduler: {scheduler_status}",
         f"📋 Tasks: <b>{len(tasks)}</b> total",
@@ -535,8 +568,7 @@ async def handle_list(message: Message) -> None:
     tasks: List = scheduler.storage.list_tasks(message.chat.id)
     if not tasks:
         await message.answer(
-            "📋 <b>Your Tasks</b>\n"
-            "━━━━━━━━━━━━━━━━━━\n\n"
+            "📋 <b>Your Tasks</b>\n\n"
             "No tasks yet.\n\n"
             "💡 <i>Use /add, /every or /remember to create one!</i>",
             parse_mode=ParseMode.HTML,
@@ -583,7 +615,6 @@ def _format_task_text(task) -> str:
 
     return (
         f"{type_icon} <b>{escape_html(task_name)}</b> <code>#{task.id}</code>\n"
-        f"━━━━━━━━━━━━━━━━━━\n"
         f"{schedule_icon} {when} · {task.timezone}\n"
         f"{status_line}\n\n"
         f"📝 {escape_html(prompt_display)}"

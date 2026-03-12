@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.0.4] — 2026-03-12
+
+### Added
+- Free text messages (without `/` prefix) now query the LLM instantly, just like `/ask`.
+- Updated `/start` help text to reflect free text query capability.
+
+### Changed
+- Removed decorative separator lines (━━━━━━━━━━━━━━━━━━) from all bot messages for a cleaner, more consistent UI.
+
+---
+
 ## [0.0.3] — 2026-03-10
 
 ### Added
